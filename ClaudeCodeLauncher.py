@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Code Launcher - Session Management Tool für ClaudeHome"""
+"""Claude Code Launcher - Session Management Tool für Workspace"""
 
 VERSION = "vYYMMDD"
 
@@ -647,35 +647,35 @@ class ConfigManager:
         return self.config[key]
 
 
-class ClaudeHomeManager:
-    """Verwaltet ClaudeHome-Operationen (Reset, Export, Import)."""
+class WorkspaceManager:
+    """Verwaltet Workspace-Operationen (Reset, Export, Import)."""
 
     def __init__(
         self,
-        claude_home_path: Path,
+        workspace_path: Path,
         config_manager: "ConfigManager | None" = None,
     ):
-        """Initialisiert den ClaudeHomeManager.
+        """Initialisiert den WorkspaceManager.
 
         Args:
-            claude_home_path: Pfad zum ClaudeHome-Verzeichnis.
+            workspace_path: Pfad zum Workspace-Verzeichnis.
             config_manager: Optionaler ConfigManager für Ignore-Patterns und Config-Zugriff.
         """
-        self.claude_home = Path(claude_home_path)
-        self.settings_file = self.claude_home / "settings.local.json"
+        self.workspace = Path(workspace_path)
+        self.settings_file = self.workspace / "settings.local.json"
         self.config_manager = config_manager
 
     def is_empty(self) -> bool:
-        """Prüft ob ClaudeHome leer ist (ignoriert settings.local.json).
+        """Prüft ob Workspace leer ist (ignoriert settings.local.json).
 
         Returns:
             True wenn keine relevanten Dateien vorhanden sind.
         """
-        if not self.claude_home.exists():
+        if not self.workspace.exists():
             return True
         return not any(
             item.is_file() and item != self.settings_file
-            for item in self.claude_home.rglob("*")
+            for item in self.workspace.rglob("*")
         )
 
     def get_status(self) -> dict:
@@ -689,7 +689,7 @@ class ClaudeHomeManager:
 
         file_count = 0
         total_size = 0
-        for item in self.claude_home.rglob("*"):
+        for item in self.workspace.rglob("*"):
             if item.is_file() and item != self.settings_file:
                 file_count += 1
                 total_size += item.stat().st_size
@@ -707,15 +707,15 @@ class ClaudeHomeManager:
             Sortierte Liste von (relativer_pfad, Anzeigetext) Tuples.
             settings.local.json wird mit 🔒 markiert.
         """
-        if not self.claude_home.exists():
+        if not self.workspace.exists():
             return []
 
         entries = []
-        for item in sorted(self.claude_home.rglob("*")):
+        for item in sorted(self.workspace.rglob("*")):
             if not item.is_file():
                 continue
 
-            rel_path = str(item.relative_to(self.claude_home))
+            rel_path = str(item.relative_to(self.workspace))
             size = item.stat().st_size
 
             if size < BYTES_PER_KB:
@@ -746,12 +746,12 @@ class ClaudeHomeManager:
             shutil.rmtree(item)
 
     def _clear_directory(self) -> None:
-        """Löscht alle Einträge in ClaudeHome oder erstellt es neu."""
-        if self.claude_home.exists():
-            for item in self.claude_home.iterdir():
+        """Löscht alle Einträge in Workspace oder erstellt es neu."""
+        if self.workspace.exists():
+            for item in self.workspace.iterdir():
                 self._delete_item(item)
         else:
-            self.claude_home.mkdir(parents=True, exist_ok=True)
+            self.workspace.mkdir(parents=True, exist_ok=True)
 
     def _get_ignore_arg(self, pattern_key: str):
         """Gibt shutil.ignore_patterns-Argument zurück, falls Patterns konfiguriert.
@@ -792,14 +792,14 @@ class ClaudeHomeManager:
         )
 
     def reset(self) -> bool:
-        """Löscht ClaudeHome vollständig (alle Dateien und Verzeichnisse).
+        """Löscht Workspace vollständig (alle Dateien und Verzeichnisse).
 
         Returns:
             True bei Erfolg, False bei Fehler.
         """
         try:
             self._clear_directory()
-            print("✓ ClaudeHome erfolgreich zurückgesetzt")
+            print("✓ Workspace erfolgreich zurückgesetzt")
             return True
         except PermissionError as e:
             print(f"✗ Keine Berechtigung: {e}")
@@ -809,7 +809,7 @@ class ClaudeHomeManager:
             return False
 
     def export_to(self, destination: Path) -> bool:
-        """Exportiert ClaudeHome zu Ziel-Pfad (Folder Mode).
+        """Exportiert Workspace zu Ziel-Pfad (Folder Mode).
 
         Args:
             destination: Ziel-Verzeichnis für den Export.
@@ -835,7 +835,7 @@ class ClaudeHomeManager:
             kwargs: dict = {"dirs_exist_ok": True}
             if ignore_arg:
                 kwargs["ignore"] = ignore_arg
-            shutil.copytree(self.claude_home, destination, **kwargs)
+            shutil.copytree(self.workspace, destination, **kwargs)
 
             print(f"✓ Erfolgreich exportiert nach: {destination}")
 
@@ -846,7 +846,7 @@ class ClaudeHomeManager:
             )
             if ask_for_reset:
                 if curses.wrapper(
-                    curses_confirm, "ClaudeHome jetzt zurücksetzen?", default=False
+                    curses_confirm, "Workspace jetzt zurücksetzen?", default=False
                 ):
                     return self.reset()
 
@@ -860,16 +860,16 @@ class ClaudeHomeManager:
             return False
 
     def export_file_to(self, rel_file_path: str, destination: Path) -> bool:
-        """Exportiert eine einzelne Datei aus ClaudeHome nach destination.
+        """Exportiert eine einzelne Datei aus Workspace nach destination.
 
         Args:
-            rel_file_path: Relativer Pfad der Quelldatei innerhalb von ClaudeHome.
+            rel_file_path: Relativer Pfad der Quelldatei innerhalb von Workspace.
             destination: Zieldatei-Pfad.
 
         Returns:
             True bei Erfolg, False bei Fehler.
         """
-        source_file = self.claude_home / rel_file_path
+        source_file = self.workspace / rel_file_path
 
         if not source_file.exists():
             curses.wrapper(
@@ -904,7 +904,7 @@ class ClaudeHomeManager:
             return False
 
     def import_file_from(self, source_file: Path) -> bool:
-        """Importiert eine einzelne Datei nach ClaudeHome-Root.
+        """Importiert eine einzelne Datei nach Workspace-Root.
 
         Args:
             source_file: Quelldatei-Pfad.
@@ -934,7 +934,7 @@ class ClaudeHomeManager:
                 break
 
         try:
-            destination = self.claude_home / source_file.name
+            destination = self.workspace / source_file.name
             shutil.copy2(source_file, destination)
             return True
         except PermissionError as e:
@@ -945,7 +945,7 @@ class ClaudeHomeManager:
             return False
 
     def import_from(self, source: Path) -> bool:
-        """Importiert ClaudeHome von Quell-Pfad (Folder Mode).
+        """Importiert Workspace von Quell-Pfad (Folder Mode).
 
         Args:
             source: Quell-Verzeichnis für den Import.
@@ -971,7 +971,7 @@ class ClaudeHomeManager:
             if not self.is_empty():
                 confirm = curses.wrapper(
                     curses_confirm,
-                    "Alle Daten im ClaudeHome werden beim Import gelöscht!\nFortfahren?",
+                    "Alle Daten im Workspace werden beim Import gelöscht!\nFortfahren?",
                     default=False,
                 )
                 if not confirm:
@@ -983,7 +983,7 @@ class ClaudeHomeManager:
             kwargs: dict = {"dirs_exist_ok": True}
             if ignore_arg:
                 kwargs["ignore"] = ignore_arg
-            shutil.copytree(source, self.claude_home, **kwargs)
+            shutil.copytree(source, self.workspace, **kwargs)
 
             print(f"✓ Erfolgreich importiert von: {source}")
             return True
@@ -1001,7 +1001,7 @@ class LauncherApp:
 
     def __init__(
         self,
-        claude_home: Path,
+        workspace: Path,
         config_manager: ConfigManager,
         claude_binary: Path,
         export_path: Path | None = None,
@@ -1010,32 +1010,32 @@ class LauncherApp:
         """Initialisiert die LauncherApp.
 
         Args:
-            claude_home: Pfad zum ClaudeHome-Verzeichnis.
+            workspace: Pfad zum Workspace-Verzeichnis.
             config_manager: ConfigManager-Instanz.
             claude_binary: Pfad zum Claude Binary.
             export_path: Optionaler Direkt-Export-Pfad (CLI-Argument).
             import_path: Optionaler Direkt-Import-Pfad (CLI-Argument).
         """
         self.config_manager = config_manager
-        self.claude_home_manager = ClaudeHomeManager(claude_home, config_manager)
+        self.workspace_manager = WorkspaceManager(workspace, config_manager)
         self.claude_binary = Path(claude_binary)
         self.export_path = export_path
         self.import_path = import_path
 
     def get_menu_items(self) -> list[tuple[str, str]]:
-        """Generiert Menü-Items basierend auf ClaudeHome-Status.
+        """Generiert Menü-Items basierend auf Workspace-Status.
 
         Returns:
             Liste von (action_key, label) Tuples für das Hauptmenü.
         """
-        is_empty = self.claude_home_manager.is_empty()
+        is_empty = self.workspace_manager.is_empty()
         items: list[tuple[str, str]] = []
 
         items.append(("plan", "📝 Plan schreiben"))
 
         if not is_empty:
             items.append(("export", "⤴️  Exportieren"))
-            items.append(("browse", "📂 Inhalt von ClaudeHome anzeigen"))
+            items.append(("browse", "📂 Inhalt von Workspace anzeigen"))
 
         items.append(("import", "⤵️  Importieren"))
 
@@ -1055,12 +1055,12 @@ class LauncherApp:
         """Generiert den mehrzeiligen Status-String für das Hauptmenü.
 
         Args:
-            status: Status-Dict von ClaudeHomeManager.get_status().
+            status: Status-Dict von WorkspaceManager.get_status().
 
         Returns:
             Mehrzeiliger String: Info-Zeilen + Footer als letzte Zeile.
         """
-        claude_home_path = str(self.claude_home_manager.claude_home)
+        workspace_path = str(self.workspace_manager.workspace)
         ask_reset = self.config_manager.config.get("ask_for_reset", True)
         dont_ask_overwrite = self.config_manager.config.get(
             "dont_ask_on_export_overwrite", False
@@ -1086,7 +1086,7 @@ class LauncherApp:
             else f"   {status['file_count']} Dateien · {status['size_mb']} MB"
         )
 
-        return f"📁 {claude_home_path}\n{content_line}\n{export_line}{footer}"
+        return f"📁 {workspace_path}\n{content_line}\n{export_line}{footer}"
 
     @staticmethod
     def _get_export_line(last_export: dict | None, last_reset_ts: str | None) -> str:
@@ -1201,23 +1201,23 @@ class LauncherApp:
 
     def handle_reset(self) -> None:
         """Reset-Operation mit Bestätigung."""
-        if self.claude_home_manager.is_empty():
+        if self.workspace_manager.is_empty():
             return
 
         confirm = curses.wrapper(
             curses_confirm,
-            "Alle Daten im ClaudeHome werden gelöscht!\nFortfahren?",
+            "Alle Daten im Workspace werden gelöscht!\nFortfahren?",
             default=False,
         )
         if confirm:
-            if self.claude_home_manager.reset():
+            if self.workspace_manager.reset():
                 self.config_manager.record_reset()
 
     def handle_export(self) -> None:
         """Export-Operation mit Auto-Detect: Single File oder Folder."""
-        if self.claude_home_manager.is_empty():
+        if self.workspace_manager.is_empty():
             curses.wrapper(
-                curses_message, "Export", "ClaudeHome ist leer, nichts zu exportieren"
+                curses_message, "Export", "Workspace ist leer, nichts zu exportieren"
             )
             return
 
@@ -1228,12 +1228,12 @@ class LauncherApp:
         if destination.suffix != "" or destination.is_file():
             self._handle_single_file_export(destination)
         else:
-            success = self.claude_home_manager.export_to(destination)
+            success = self.workspace_manager.export_to(destination)
             if success:
                 self.config_manager.add_to_history(destination, "export")
 
     def _handle_single_file_export(self, destination: Path) -> None:
-        """Exportiert eine einzelne Datei aus ClaudeHome – Dateiname aus Zielpfad.
+        """Exportiert eine einzelne Datei aus Workspace – Dateiname aus Zielpfad.
 
         Args:
             destination: Zieldatei-Pfad; Dateiname bestimmt gesuchte Quelldatei.
@@ -1241,7 +1241,7 @@ class LauncherApp:
         filename = destination.name
         matches = [
             item
-            for item in self.claude_home_manager.claude_home.rglob(filename)
+            for item in self.workspace_manager.workspace.rglob(filename)
             if item.is_file()
         ]
 
@@ -1249,12 +1249,12 @@ class LauncherApp:
             curses.wrapper(
                 curses_message,
                 "Export",
-                f"Datei '{filename}' nicht in ClaudeHome gefunden.",
+                f"Datei '{filename}' nicht in Workspace gefunden.",
             )
             return
 
         source_file = matches[0]
-        rel_path = str(source_file.relative_to(self.claude_home_manager.claude_home))
+        rel_path = str(source_file.relative_to(self.workspace_manager.workspace))
 
         if destination.exists():
             dont_ask = self.config_manager.config.get(
@@ -1269,7 +1269,7 @@ class LauncherApp:
                 if not overwrite:
                     return
 
-        success = self.claude_home_manager.export_file_to(rel_path, destination)
+        success = self.workspace_manager.export_file_to(rel_path, destination)
         if success:
             self.config_manager.add_to_history(destination, "export")
 
@@ -1280,11 +1280,11 @@ class LauncherApp:
             return
 
         if source.is_file():
-            success = self.claude_home_manager.import_file_from(source)
+            success = self.workspace_manager.import_file_from(source)
             if success:
                 self.config_manager.add_to_history(source, "import")
         elif source.is_dir():
-            success = self.claude_home_manager.import_from(source)
+            success = self.workspace_manager.import_from(source)
             if success:
                 self.config_manager.add_to_history(source, "import")
         else:
@@ -1312,7 +1312,7 @@ class LauncherApp:
 
             result = subprocess.run(
                 [str(self.claude_binary)],
-                cwd=str(self.claude_home_manager.claude_home),
+                cwd=str(self.workspace_manager.workspace),
                 env=env,
             )
             print(f"\nClaude wurde beendet (Exit Code: {result.returncode})")
@@ -1345,21 +1345,21 @@ class LauncherApp:
             json.dump(settings, f, indent=2)
 
     def handle_browse(self) -> None:
-        """Zeigt ClaudeHome-Inhalt in scrollbarer Ansicht."""
-        contents = self.claude_home_manager.get_contents()
-        status = self.claude_home_manager.get_status()
+        """Zeigt Workspace-Inhalt in scrollbarer Ansicht."""
+        contents = self.workspace_manager.get_contents()
+        status = self.workspace_manager.get_status()
         summary = f"{status['file_count']} Dateien | {status['size_mb']} MB"
-        curses.wrapper(curses_browse, "📂 ClaudeHome Inhalt", summary, contents)
+        curses.wrapper(curses_browse, "📂 Workspace Inhalt", summary, contents)
 
     def handle_plan(self) -> None:
-        """Öffnet oder erstellt Plan.md im ClaudeHome mit vi."""
-        plan_file = self.claude_home_manager.claude_home / "Plan.md"
+        """Öffnet oder erstellt Plan.md im Workspace mit vi."""
+        plan_file = self.workspace_manager.workspace / "Plan.md"
         subprocess.run(["vi", str(plan_file)])
 
     def handle_shell(self) -> None:
-        """Öffnet eine Shell im ClaudeHome-Verzeichnis."""
+        """Öffnet eine Shell im Workspace-Verzeichnis."""
         shell = os.environ.get("SHELL", "/bin/zsh")
-        subprocess.run([shell], cwd=str(self.claude_home_manager.claude_home))
+        subprocess.run([shell], cwd=str(self.workspace_manager.workspace))
 
     def handle_action(self, action: str) -> tuple[bool, bool]:
         """Führt Menü-Aktion aus.
@@ -1401,7 +1401,7 @@ class LauncherApp:
                 return
 
             while True:
-                status = self.claude_home_manager.get_status()
+                status = self.workspace_manager.get_status()
                 menu_items = self.get_menu_items()
                 status_text = self._build_status_text(status)
 
@@ -1448,26 +1448,26 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Beispiele:
-  %(prog)s /path/to/.claude                     # Verwendet angegebenes ClaudeHome
+  %(prog)s /path/to/.claude                     # Verwendet angegebenes Workspace
   %(prog)s /path/to/.claude --export /backup    # Exportiert direkt zu angegebenem Pfad
   %(prog)s /path/to/.claude --import /backup    # Importiert direkt von angegebenem Pfad
   %(prog)s /path/to/.claude --config custom.yaml # Verwendet eigene Config-Datei
         """,
     )
     parser.add_argument(
-        "claude_home", help="Pfad zum ClaudeHome Verzeichnis (REQUIRED)"
+        "workspace", help="Pfad zum Workspace Verzeichnis (REQUIRED)"
     )
     parser.add_argument(
         "--export",
         dest="export_path",
         metavar="PATH",
-        help="Exportiert ClaudeHome direkt zum angegebenen Pfad",
+        help="Exportiert Workspace direkt zum angegebenen Pfad",
     )
     parser.add_argument(
         "--import",
         dest="import_path",
         metavar="PATH",
-        help="Importiert ClaudeHome direkt vom angegebenen Pfad",
+        help="Importiert Workspace direkt vom angegebenen Pfad",
     )
     parser.add_argument(
         "--config",
@@ -1495,25 +1495,25 @@ Beispiele:
             )
             sys.exit(1)
 
-    claude_home = Path(args.claude_home).absolute()
+    workspace = Path(args.workspace).absolute()
     config_manager = ConfigManager(Path(args.config) if args.config else None)
 
-    # Prüfen ob ClaudeHome existiert, BEVOR ncurses startet
-    if not claude_home.exists():
-        print(f"ClaudeHome existiert nicht: {claude_home}")
-        response = input("Möchten Sie das ClaudeHome-Verzeichnis anlegen? (j/n): ")
+    # Prüfen ob Workspace existiert, BEVOR ncurses startet
+    if not workspace.exists():
+        print(f"Workspace existiert nicht: {workspace}")
+        response = input("Möchten Sie das Workspace-Verzeichnis anlegen? (j/n): ")
         if response.lower() in ["j", "y", "ja", "yes"]:
-            claude_home.mkdir(parents=True, exist_ok=True)
-            print(f"✓ ClaudeHome erstellt: {claude_home}\n")
+            workspace.mkdir(parents=True, exist_ok=True)
+            print(f"✓ Workspace erstellt: {workspace}\n")
         else:
-            print("Abgebrochen. ClaudeHome wurde nicht erstellt.")
+            print("Abgebrochen. Workspace wurde nicht erstellt.")
             sys.exit(0)
 
     export_path = Path(args.export_path).absolute() if args.export_path else None
     import_path = Path(args.import_path).absolute() if args.import_path else None
 
     app = LauncherApp(
-        claude_home,
+        workspace,
         config_manager,
         claude_binary,
         export_path=export_path,

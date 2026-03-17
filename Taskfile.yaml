@@ -1,0 +1,41 @@
+version: "3"
+
+silent: true
+
+tasks:
+  default:
+    desc: "Baue das Projekt"
+    cmds:
+      - task: pre-clean
+      - task: build
+      - task: install
+      - task: post-clean
+
+  pre-clean:
+    desc: "Bereinige vorherige Builds"
+    cmds:
+      - rm -rf build dist __pycache__
+      - rm -rf /opt/homebrew/bin/ClaudeCodeLauncher
+
+  build:
+    desc: "Erstelle die Anwendung mit gesetzter Version"
+    vars:
+      BUILD_DATE:
+        sh: date +%y%m%d
+    cmds:
+      # Kopie mit gesetzter Version anlegen
+      - cp ClaudeCodeLauncher.py _ClaudeCodeLauncher_versioned.py
+      - sed -i '' 's/VERSION = "vYYMMDD"/VERSION = "v{{.BUILD_DATE}}"/' _ClaudeCodeLauncher_versioned.py
+      # Temporäre Spec anlegen die auf die versionierte Kopie zeigt
+      - sed 's/ClaudeCodeLauncher\.py/_ClaudeCodeLauncher_versioned.py/' ClaudeCodeLauncher.spec > _versioned.spec
+      - pyinstaller _versioned.spec >/dev/null 2>&1
+
+  install:
+    desc: "Installiere das Build"
+    cmds:
+      - cp dist/ClaudeCodeLauncher /opt/homebrew/bin
+
+  post-clean:
+    desc: "Entfernt temporäre Build-Kopien"
+    cmds:
+      - rm -f _ClaudeCodeLauncher_versioned.py _versioned.spec

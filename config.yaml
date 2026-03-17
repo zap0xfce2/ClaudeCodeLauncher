@@ -1,0 +1,16 @@
+max_history_entries: 10
+history:
+  - path: /your/path/ClaudeCodeLauncher
+    timestamp: "2026-02-08T21:08:38.175323"
+  - path: /your/path/Test2
+    timestamp: "2026-02-08T00:21:51.145375"
+  - path: /your/path/Test
+    timestamp: "2026-02-07T22:47:16.552642"
+export_ignore_patterns: []
+import_ignore_patterns:
+  - .git
+  - .env
+  - build
+  - dist
+claude_env:
+  ENABLE_TOOL_SEARCH: "true"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Claude Code Launcher - Session Management Tool für Workspace"""
 
-VERSION = "vYYMMDD"
+VERSION = "vYYMMDDhhmm"
 
 import fnmatch
 import json
@@ -14,6 +14,7 @@ import curses
 import subprocess
 from pathlib import Path
 from datetime import datetime
+from typing import Any, Literal, overload
 
 # --- Curses Farb-Paar IDs ---
 COLOR_PAIR_CYAN = 1
@@ -38,16 +39,45 @@ MENU_RIGHT_COL_BUFFER = 18
 BYTES_PER_KB = 1024
 BYTES_PER_MB = 1024 * 1024
 
+# --- Einrückung für Listen-Einträge (UI_PADDING_X + "> " Präfix) ---
+ITEM_INDENT_X = UI_PADDING_X + 2  # = 4
+
 
 def _init_curses_colors(stdscr: "curses.window") -> None:
-    """Initialisiert alle Curses Farb-Paare einmalig.
+    """Initialisiert alle Curses Farb-Paare und setzt Cursor einmalig.
 
     Args:
         stdscr: Das Curses Hauptfenster.
     """
+    curses.curs_set(0)
     curses.init_pair(COLOR_PAIR_CYAN, curses.COLOR_CYAN, curses.COLOR_BLACK)
     curses.init_pair(COLOR_PAIR_YELLOW, curses.COLOR_YELLOW, curses.COLOR_BLACK)
     curses.init_pair(COLOR_PAIR_GREEN, curses.COLOR_GREEN, curses.COLOR_BLACK)
+
+
+def _is_up_key(key: int) -> bool:
+    """Prüft ob key eine Aufwärts-Navigation auslöst.
+
+    Args:
+        key: Curses-Tastencode.
+
+    Returns:
+        True für KEY_UP, k oder Shift+Tab.
+    """
+    return key in (curses.KEY_UP, ord("k"), curses.KEY_BTAB)
+
+
+def _is_down_key(key: int, include_tab: bool = True) -> bool:
+    """Prüft ob key eine Abwärts-Navigation auslöst.
+
+    Args:
+        key: Curses-Tastencode.
+        include_tab: Ob Tab als Abwärts-Taste gilt (Standard: True).
+
+    Returns:
+        True für KEY_DOWN, j oder (wenn include_tab) Tab.
+    """
+    return key in (curses.KEY_DOWN, ord("j")) or (include_tab and key == KEY_TAB)
 
 
 def curses_menu(
@@ -69,7 +99,6 @@ def curses_menu(
     Returns:
         Action-Key des gewählten Eintrags, Sentinel-String oder None bei Abbruch.
     """
-    curses.curs_set(0)
     _init_curses_colors(stdscr)
     current = default_index
 
@@ -142,9 +171,9 @@ def curses_menu(
 
         key = stdscr.getch()
 
-        if key == curses.KEY_UP or key == ord("k") or key == curses.KEY_BTAB:
+        if _is_up_key(key):
             current = (current - 1) % len(menu_items)
-        elif key == curses.KEY_DOWN or key == ord("j") or key == KEY_TAB:
+        elif _is_down_key(key):
             current = (current + 1) % len(menu_items)
         elif key == ord("\n") or key == KEY_SPACE:
             return menu_items[current][0]
@@ -175,7 +204,6 @@ def curses_confirm(
     Returns:
         True für Ja, False für Nein oder Abbruch.
     """
-    curses.curs_set(0)
     _init_curses_colors(stdscr)
     current = 0 if default else 1
     choices = ["Ja", "Nein"]
@@ -230,7 +258,7 @@ def curses_confirm(
         elif key == curses.KEY_RIGHT or key == ord("l"):
             current = 1
         elif key == KEY_TAB:
-            current = 1 - current  # Toggle zwischen Ja und Nein
+            current ^= 1  # Toggle zwischen Ja (0) und Nein (1)
         elif key == ord("\n") or key == KEY_SPACE:
             return current == 0
         elif key == ord("y") or key == ord("j"):  # j=ja (Deutsch), y=yes (Englisch)
@@ -256,8 +284,8 @@ def curses_input(
     Returns:
         Eingegebener Text oder None bei Abbruch (ESC).
     """
+    _init_curses_colors(stdscr)  # setzt curs_set(0), danach überschreiben
     curses.curs_set(1)
-    _init_curses_colors(stdscr)
     stdscr.clear()
     height, width = stdscr.getmaxyx()
 
@@ -271,17 +299,17 @@ def curses_input(
     cursor_pos = len(user_input)
 
     while True:
-        stdscr.addstr(y, 4, user_input + " " * (width - len(user_input) - 6))
-        stdscr.move(y, 4 + cursor_pos)
+        stdscr.addstr(
+            y, ITEM_INDENT_X, user_input + " " * (width - len(user_input) - 6)
+        )
+        stdscr.move(y, ITEM_INDENT_X + cursor_pos)
         stdscr.refresh()
 
         key = stdscr.getch()
 
         if key == ord("\n"):
-            curses.curs_set(0)
             return user_input
         elif key == KEY_ESC:
-            curses.curs_set(0)
             return None
         elif key == curses.KEY_BACKSPACE or key == KEY_BACKSPACE_DEL:
             if cursor_pos > 0:
@@ -294,6 +322,26 @@ def curses_input(
         elif KEY_SPACE <= key <= KEY_PRINTABLE_MAX:
             user_input = user_input[:cursor_pos] + chr(key) + user_input[cursor_pos:]
             cursor_pos += 1
+
+
+@overload
+def curses_select(
+    stdscr: "curses.window",
+    title: str,
+    items: list[tuple[str, str]],
+    default_index: int,
+    allow_edit: Literal[True],
+) -> tuple[str | None, bool]: ...
+
+
+@overload
+def curses_select(
+    stdscr: "curses.window",
+    title: str,
+    items: list[tuple[str, str]],
+    default_index: int = ...,
+    allow_edit: Literal[False] = ...,
+) -> str | None: ...
 
 
 def curses_select(
@@ -316,7 +364,6 @@ def curses_select(
         Wenn allow_edit=False: Gewählter value-String oder None.
         Wenn allow_edit=True: Tuple (value, edit_mode) oder (None, False).
     """
-    curses.curs_set(0)
     _init_curses_colors(stdscr)
     current = default_index
 
@@ -336,12 +383,12 @@ def curses_select(
             if i == current:
                 stdscr.addstr(
                     y,
-                    4,
+                    ITEM_INDENT_X,
                     f"> {label}",
                     curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD,
                 )
             else:
-                stdscr.addstr(y, 4, f"  {label}")
+                stdscr.addstr(y, ITEM_INDENT_X, f"  {label}")
 
         # Hint-Zeile
         if allow_edit:
@@ -356,13 +403,9 @@ def curses_select(
 
         key = stdscr.getch()
 
-        if key == curses.KEY_UP or key == ord("k") or key == curses.KEY_BTAB:
+        if _is_up_key(key):
             current = (current - 1) % len(items)
-        elif (
-            key == curses.KEY_DOWN
-            or key == ord("j")
-            or (key == KEY_TAB and not allow_edit)
-        ):
+        elif _is_down_key(key, include_tab=not allow_edit):
             current = (current + 1) % len(items)
         elif allow_edit and key == KEY_TAB:  # Tab im Edit-Modus → Editierdialog öffnen
             return (items[current][0], True)
@@ -390,7 +433,6 @@ def curses_browse(
         summary: Zusammenfassung (Dateianzahl, Gesamtgröße).
         items: Liste von (value, label) Tuples zum Anzeigen.
     """
-    curses.curs_set(0)
     _init_curses_colors(stdscr)
     height, width = stdscr.getmaxyx()
 
@@ -406,7 +448,7 @@ def curses_browse(
         stdscr.addstr(
             2, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD
         )
-        stdscr.addstr(4, 4, "Keine Dateien vorhanden.")
+        stdscr.addstr(MENU_START_ROW, ITEM_INDENT_X, "Keine Dateien vorhanden.")
         stdscr.addstr(
             height - 2, UI_PADDING_X, "ESC Zurück", curses.color_pair(COLOR_PAIR_YELLOW)
         )
@@ -446,12 +488,12 @@ def curses_browse(
             if idx == current:
                 stdscr.addstr(
                     y,
-                    4,
+                    ITEM_INDENT_X,
                     f"> {display}",
                     curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD,
                 )
             else:
-                stdscr.addstr(y, 4, f"  {display}")
+                stdscr.addstr(y, ITEM_INDENT_X, f"  {display}")
 
         # Position-Indikator und Hint
         pos_text = f"[{current + 1}/{len(items)}]"
@@ -470,9 +512,9 @@ def curses_browse(
 
         key = stdscr.getch()
 
-        if key == curses.KEY_UP or key == ord("k") or key == curses.KEY_BTAB:
+        if _is_up_key(key):
             current = (current - 1) % len(items)
-        elif key == curses.KEY_DOWN or key == ord("j") or key == KEY_TAB:
+        elif _is_down_key(key):
             current = (current + 1) % len(items)
         elif key == KEY_ESC:
             return
@@ -490,7 +532,6 @@ def curses_message(
         title: Überschrift der Meldung.
         message: Meldungstext (kann Zeilenumbrüche enthalten).
     """
-    curses.curs_set(0)
     _init_curses_colors(stdscr)
     stdscr.clear()
     height, width = stdscr.getmaxyx()
@@ -532,11 +573,14 @@ class ConfigManager:
         self.config_path = Path(config_path)
         self.config = self.load_config()
 
-    def load_config(self) -> dict:
+    def load_config(self) -> dict[str, Any]:
         """Lädt Config oder erstellt Default falls nicht vorhanden.
 
         Returns:
             Config-Dictionary mit allen Einstellungen.
+
+        Raises:
+            yaml.YAMLError: Bei korrupter YAML-Datei (wird abgefangen, Backup erstellt).
         """
         default_config = {
             "history": [],
@@ -567,7 +611,7 @@ class ConfigManager:
                 shutil.copy(self.config_path, backup_path)
             return default_config
 
-    def save_config(self, config: dict | None = None) -> None:
+    def save_config(self, config: dict[str, Any] | None = None) -> None:
         """Speichert Config in YAML.
 
         Args:
@@ -687,12 +731,13 @@ class WorkspaceManager:
         if self.is_empty():
             return {"is_empty": True, "file_count": 0, "size_mb": 0.0}
 
-        file_count = 0
-        total_size = 0
-        for item in self.workspace.rglob("*"):
-            if item.is_file() and item != self.settings_file:
-                file_count += 1
-                total_size += item.stat().st_size
+        relevant_files = [
+            item
+            for item in self.workspace.rglob("*")
+            if item.is_file() and item != self.settings_file
+        ]
+        file_count = len(relevant_files)
+        total_size = sum(item.stat().st_size for item in relevant_files)
 
         return {
             "is_empty": False,
@@ -753,7 +798,7 @@ class WorkspaceManager:
         else:
             self.workspace.mkdir(parents=True, exist_ok=True)
 
-    def _get_ignore_arg(self, pattern_key: str):
+    def _get_ignore_arg(self, pattern_key: str) -> Any | None:
         """Gibt shutil.ignore_patterns-Argument zurück, falls Patterns konfiguriert.
 
         Args:
@@ -768,6 +813,22 @@ class WorkspaceManager:
             else []
         )
         return shutil.ignore_patterns(*patterns) if patterns else None
+
+    @staticmethod
+    def _is_file_ignored(filename: str, patterns: list[str]) -> str | None:
+        """Gibt das erste passende Ignore-Pattern zurück oder None.
+
+        Args:
+            filename: Zu prüfender Dateiname.
+            patterns: Liste von fnmatch-Patterns.
+
+        Returns:
+            Das erste passende Pattern oder None wenn kein Pattern zutrifft.
+        """
+        return next(
+            (pattern for pattern in patterns if fnmatch.fnmatch(filename, pattern)),
+            None,
+        )
 
     def _confirm_overwrite(self, destination: Path) -> bool:
         """Fragt Bestätigung zum Überschreiben, sofern Config es nicht deaktiviert.
@@ -832,7 +893,7 @@ class WorkspaceManager:
                 return False
 
             ignore_arg = self._get_ignore_arg("export_ignore_patterns")
-            kwargs: dict = {"dirs_exist_ok": True}
+            kwargs: dict[str, Any] = {"dirs_exist_ok": True}
             if ignore_arg:
                 kwargs["ignore"] = ignore_arg
             shutil.copytree(self.workspace, destination, **kwargs)
@@ -883,14 +944,13 @@ class WorkspaceManager:
             if self.config_manager
             else []
         )
-        for pattern in ignore_patterns:
-            if fnmatch.fnmatch(source_file.name, pattern):
-                curses.wrapper(
-                    curses_message,
-                    "Warnung",
-                    f"Datei entspricht Ignore-Pattern '{pattern}'.\nExport wird trotzdem durchgeführt.",
-                )
-                break
+        matched_pattern = self._is_file_ignored(source_file.name, ignore_patterns)
+        if matched_pattern:
+            curses.wrapper(
+                curses_message,
+                "Warnung",
+                f"Datei entspricht Ignore-Pattern '{matched_pattern}'.\nExport wird trotzdem durchgeführt.",
+            )
 
         try:
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -924,14 +984,13 @@ class WorkspaceManager:
             if self.config_manager
             else []
         )
-        for pattern in ignore_patterns:
-            if fnmatch.fnmatch(source_file.name, pattern):
-                curses.wrapper(
-                    curses_message,
-                    "Warnung",
-                    f"Datei entspricht Ignore-Pattern '{pattern}'.\nImport wird trotzdem durchgeführt.",
-                )
-                break
+        matched_pattern = self._is_file_ignored(source_file.name, ignore_patterns)
+        if matched_pattern:
+            curses.wrapper(
+                curses_message,
+                "Warnung",
+                f"Datei entspricht Ignore-Pattern '{matched_pattern}'.\nImport wird trotzdem durchgeführt.",
+            )
 
         try:
             destination = self.workspace / source_file.name
@@ -980,7 +1039,7 @@ class WorkspaceManager:
             self._clear_directory()
 
             ignore_arg = self._get_ignore_arg("import_ignore_patterns")
-            kwargs: dict = {"dirs_exist_ok": True}
+            kwargs: dict[str, Any] = {"dirs_exist_ok": True}
             if ignore_arg:
                 kwargs["ignore"] = ignore_arg
             shutil.copytree(source, self.workspace, **kwargs)
@@ -1225,6 +1284,8 @@ class LauncherApp:
         if destination is None:
             return
 
+        # Single File: Dateiendung vorhanden ODER Ziel ist bereits eine Datei
+        # (Folder Mode: kein Suffix und kein existierender File-Pfad)
         if destination.suffix != "" or destination.is_file():
             self._handle_single_file_export(destination)
         else:
@@ -1314,6 +1375,7 @@ class LauncherApp:
                 [str(self.claude_binary)],
                 cwd=str(self.workspace_manager.workspace),
                 env=env,
+                check=False,
             )
             print(f"\nClaude wurde beendet (Exit Code: {result.returncode})")
         except (OSError, subprocess.SubprocessError) as e:
@@ -1322,7 +1384,11 @@ class LauncherApp:
         return True
 
     def _apply_macos_theme(self) -> None:
-        """Setzt Claude-Theme basierend auf macOS Dark/Light Mode."""
+        """Setzt Claude-Theme basierend auf macOS Dark/Light Mode.
+
+        Liest den macOS-Interfacestil via `defaults` CLI und schreibt `theme`
+        in ~/.claude.json. Bei korrupter JSON-Datei wird sie überschrieben.
+        """
         result = subprocess.run(
             ["defaults", "read", "-g", "AppleInterfaceStyle"],
             capture_output=True,
@@ -1332,12 +1398,12 @@ class LauncherApp:
         theme = "dark" if result.stdout.strip() == "Dark" else "light"
 
         claude_json_path = Path.home() / ".claude.json"
-        settings: dict = {}
+        settings: dict[str, Any] = {}
         if claude_json_path.exists():
             try:
                 with open(claude_json_path, "r") as f:
                     settings = json.load(f)
-            except (json.JSONDecodeError, ValueError):
+            except json.JSONDecodeError:
                 settings = {}
 
         settings["theme"] = theme
@@ -1352,7 +1418,7 @@ class LauncherApp:
         curses.wrapper(curses_browse, "📂 Workspace Inhalt", summary, contents)
 
     def handle_plan(self) -> None:
-        """Öffnet oder erstellt Plan.md im Workspace mit vi."""
+        """Öffnet Plan.md im Workspace mit vi (wird erstellt falls nicht vorhanden)."""
         plan_file = self.workspace_manager.workspace / "Plan.md"
         subprocess.run(["vi", str(plan_file)])
 
@@ -1412,7 +1478,7 @@ class LauncherApp:
                 except KeyboardInterrupt:
                     print("\nAuf Wiedersehen!")
                     break
-                except Exception as e:
+                except (RuntimeError, curses.error) as e:
                     print(f"✗ Interaktives Menü nicht verfügbar: {e}")
                     print(
                         "Bitte verwende --export oder --import für nicht-interaktive Nutzung"
@@ -1454,9 +1520,7 @@ Beispiele:
   %(prog)s /path/to/.claude --config custom.yaml # Verwendet eigene Config-Datei
         """,
     )
-    parser.add_argument(
-        "workspace", help="Pfad zum Workspace Verzeichnis (REQUIRED)"
-    )
+    parser.add_argument("workspace", help="Pfad zum Workspace Verzeichnis (REQUIRED)")
     parser.add_argument(
         "--export",
         dest="export_path",

@@ -21,11 +21,11 @@ tasks:
     desc: "Erstelle die Anwendung mit gesetzter Version"
     vars:
       BUILD_DATE:
-        sh: date +%y%m%d
+        sh: date +%y%m%d%H%M
     cmds:
       # Kopie mit gesetzter Version anlegen
       - cp ClaudeCodeLauncher.py _ClaudeCodeLauncher_versioned.py
-      - sed -i '' 's/VERSION = "vYYMMDD"/VERSION = "v{{.BUILD_DATE}}"/' _ClaudeCodeLauncher_versioned.py
+      - sed -i '' 's/VERSION = "vYYMMDDhhmm"/VERSION = "v{{.BUILD_DATE}}"/' _ClaudeCodeLauncher_versioned.py
       # Temporäre Spec anlegen die auf die versionierte Kopie zeigt
       - sed 's/ClaudeCodeLauncher\.py/_ClaudeCodeLauncher_versioned.py/' ClaudeCodeLauncher.spec > _versioned.spec
       - pyinstaller _versioned.spec >/dev/null 2>&1

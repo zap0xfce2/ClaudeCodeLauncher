@@ -37,7 +37,7 @@ Erstellt via PyInstaller eine eigenständige Binary unter `/opt/homebrew/bin/Cla
 
 ## Verwendung
 
-## Was ist ein Workspace
+### Was ist ein Workspace?
 
 **Workspace** ist das Arbeitsverzeichnis einer Claude-Session – kein spezielles Konfigurationsverzeichnis. Es enthält projektspezifische Dateien wie `CLAUDE.md`, `Plan.md` oder `settings.local.json` und kann an beliebiger Stelle liegen (z. B. `/Users/alice/projects/meinem-workspace` oder `/Volumes/RamDisk/ClaudeCodeWorkspace`).
 

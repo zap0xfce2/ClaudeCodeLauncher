@@ -2,10 +2,6 @@
 
 Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions. Vereinfacht das Backup, Wiederherstellen und Wechseln zwischen verschiedenen Workspace-Verzeichnissen.
 
-## Konzept: Workspace
-
-**Workspace** ist das Arbeitsverzeichnis einer Claude-Session – kein spezielles Konfigurationsverzeichnis. Es enthält projektspezifische Dateien wie `CLAUDE.md`, `Plan.md` oder `settings.local.json` und kann an beliebiger Stelle liegen (z. B. `/Users/alice/projects/mein-projekt` oder `/Volumes/RamDisk/work`).
-
 ## Features
 
 - **Session-Management** – Neue Session starten oder bestehende fortsetzen
@@ -41,13 +37,19 @@ Erstellt via PyInstaller eine eigenständige Binary unter `/opt/homebrew/bin/Cla
 
 ## Verwendung
 
+## Was ist ein Workspace
+
+**Workspace** ist das Arbeitsverzeichnis einer Claude-Session – kein spezielles Konfigurationsverzeichnis. Es enthält projektspezifische Dateien wie `CLAUDE.md`, `Plan.md` oder `settings.local.json` und kann an beliebiger Stelle liegen (z. B. `/Users/alice/projects/meinem-workspace` oder `/Volumes/RamDisk/ClaudeCodeWorkspace`).
+
 ### Interaktiver Modus
 
+Das ist der häufigste Verwendungsfall:
+
 ```bash
-python ClaudeCodeLauncher.py /pfad/zu/mein-projekt
+python ClaudeCodeLauncher.py /pfad/zu/meinem-workspace
 
 # Mit benutzerdefinierter Config-Datei
-python ClaudeCodeLauncher.py /pfad/zu/mein-projekt --config /pfad/zur/config.yaml
+python ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --config /pfad/zur/config.yaml
 ```
 
 `config.yaml` wird standardmäßig im selben Verzeichnis wie `ClaudeCodeLauncher.py` angelegt. Das geöffnete Workspace-Verzeichnis wird im Hauptmenü oben rechts angezeigt.
@@ -56,13 +58,13 @@ python ClaudeCodeLauncher.py /pfad/zu/mein-projekt --config /pfad/zur/config.yam
 
 ```bash
 # Exportieren
-python ClaudeCodeLauncher.py /pfad/zu/mein-projekt --export /pfad/zum/backup
+python ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --export /pfad/zum/backup
 
 # Importieren
-python ClaudeCodeLauncher.py /pfad/zu/mein-projekt --import /pfad/zum/backup
+python ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --import /pfad/zum/backup
 
 # Mit benutzerdefiniertem Claude Binary
-python ClaudeCodeLauncher.py /pfad/zu/mein-projekt --claude-binary /usr/local/bin/claude
+python ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --claude-binary /usr/local/bin/claude
 ```
 
 **Single-File-Erkennung** erfolgt automatisch:
@@ -150,7 +152,3 @@ Im Pfad-Auswahlmodus (`allow_edit`) öffnet `Tab` einen vorausgefüllten Edit-Di
 | `↑` / `↓` / `j` / `k` / `Shift+Tab` | Scrollen (nach oben)  |
 | `Tab`                               | Scrollen (nach unten) |
 | `ESC`                               | Zurück                |
-
-## Versionierung
-
-Die Version folgt dem Format `vYYMMDD` (z. B. `v260312`). Der Platzhalter `"vYYMMDD"` in `ClaudeCodeLauncher.py` wird automatisch beim Build durch das aktuelle Datum ersetzt – nie manuell ändern.

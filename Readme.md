@@ -46,10 +46,10 @@ Erstellt via PyInstaller eine eigenständige Binary unter `/opt/homebrew/bin/Cla
 Das ist der häufigste Verwendungsfall:
 
 ```bash
-python ClaudeCodeLauncher.py /pfad/zu/meinem-workspace
+python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace
 
 # Mit benutzerdefinierter Config-Datei
-python ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --config /pfad/zur/config.yaml
+python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --config /pfad/zur/config.yaml
 ```
 
 `config.yaml` wird standardmäßig im selben Verzeichnis wie `ClaudeCodeLauncher.py` angelegt. Das geöffnete Workspace-Verzeichnis wird im Hauptmenü oben rechts angezeigt.
@@ -58,13 +58,13 @@ python ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --config /pfad/zur/config
 
 ```bash
 # Exportieren
-python ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --export /pfad/zum/backup
+python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --export /pfad/zum/backup
 
 # Importieren
-python ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --import /pfad/zum/backup
+python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --import /pfad/zum/backup
 
 # Mit benutzerdefiniertem Claude Binary
-python ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --claude-binary /usr/local/bin/claude
+python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --claude-binary /usr/local/bin/claude
 ```
 
 **Single-File-Erkennung** erfolgt automatisch:

@@ -4,3 +4,4 @@ build
 .claude
 CLAUDE.md
 Plan.md
+__pycache__

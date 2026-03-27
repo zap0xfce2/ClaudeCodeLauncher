@@ -27,6 +27,10 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 pip install -r requirements.txt
 ```
 
+```bash
+uv run src/ClaudeCodeLauncher.py
+```
+
 ### Binary erstellen (optional)
 
 ```bash

@@ -93,9 +93,12 @@ Die Datei `config.yaml` wird automatisch im Script-Verzeichnis erstellt und kann
 | `export_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Export übersprungen werden                                        |
 | `import_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Import übersprungen werden                                        |
 | `claude_env`                   | Dict   | `{}`     | Umgebungsvariablen für Claude beim Start (z. B. `{ANTHROPIC_MODEL: "claude-opus-4-6"}`) |
+| `claude_instruction`           | string | `""`     | Anweisung, die beim Start/Fortsetzen automatisch als erster Prompt an Claude übergeben wird (leer = keine) |
 | `ask_for_reset`                | bool   | `true`   | Nach Folder-Export: Fragen ob Workspace zurückgesetzt werden soll                       |
 | `dont_ask_on_export_overwrite` | bool   | `false`  | Überschreib-Bestätigung beim Export unterdrücken                                        |
 | `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern)              |
+
+`claude_instruction` wird manuell in `config.yaml` gepflegt; eine Änderung wirkt nach Drücken von `r` (Refresh) im Hauptmenü, ohne den Launcher neu zu starten.
 
 **Empfohlene Ignore-Patterns:**
 

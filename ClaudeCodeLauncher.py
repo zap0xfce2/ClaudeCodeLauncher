@@ -588,6 +588,7 @@ class ConfigManager:
             "export_ignore_patterns": [],
             "import_ignore_patterns": [],
             "claude_env": {},
+            "claude_instruction": "",
             "ask_for_reset": True,
             "dont_ask_on_export_overwrite": False,
         }
@@ -1371,8 +1372,18 @@ class LauncherApp:
             env = os.environ.copy()
             env.update(self.config_manager.config.get("claude_env", {}))
 
+            cmd = [str(self.claude_binary)]
+            if resume:
+                cmd.append("--continue")
+
+            instruction = self.config_manager.config.get(
+                "claude_instruction", ""
+            ).strip()
+            if instruction:
+                cmd.extend(["--", instruction])
+
             result = subprocess.run(
-                [str(self.claude_binary)],
+                cmd,
                 cwd=str(self.workspace_manager.workspace),
                 env=env,
                 check=False,

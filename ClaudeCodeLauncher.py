@@ -1099,10 +1099,7 @@ class LauncherApp:
 
         items.append(("import", "⤵️  Importieren"))
 
-        if is_empty:
-            items.append(("start", "▶️  Neue Sitzung starten"))
-        else:
-            items.append(("resume", "▶️  Sitzung fortsetzen"))
+        items.append(("start", "▶️  Sitzung starten"))
 
         items.append(("shell", "🖥️  Shell öffnen"))
 
@@ -1352,11 +1349,8 @@ class LauncherApp:
         else:
             curses.wrapper(curses_message, "Fehler", f"Pfad existiert nicht:\n{source}")
 
-    def launch_claude(self, resume: bool) -> bool:
+    def launch_claude(self) -> bool:
         """Startet Claude als Subprocess, kehrt zum Menü zurück nach Exit.
-
-        Args:
-            resume: True für Session-Resume, False für neue Session.
 
         Returns:
             True (Menü-Loop fortsetzen).
@@ -1373,8 +1367,6 @@ class LauncherApp:
             env.update(self.config_manager.config.get("claude_env", {}))
 
             cmd = [str(self.claude_binary)]
-            if resume:
-                cmd.append("--continue")
 
             instruction = self.config_manager.config.get(
                 "claude_instruction", ""
@@ -1449,8 +1441,8 @@ class LauncherApp:
         """
         if action == "reset":
             self.handle_reset()
-        elif action in ("start", "resume"):
-            self.launch_claude(action == "resume")
+        elif action == "start":
+            self.launch_claude()
         elif action == "export":
             self.handle_export()
         elif action == "import":

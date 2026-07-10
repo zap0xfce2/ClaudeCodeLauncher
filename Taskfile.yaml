@@ -4,7 +4,7 @@ silent: true
 
 tasks:
   default:
-    desc: "Baue das Projekt"
+    desc: "Bauen & Installieren"
     cmds:
       - task: pre-clean
       - task: build

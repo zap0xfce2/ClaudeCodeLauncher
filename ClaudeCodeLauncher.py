@@ -1092,14 +1092,15 @@ class LauncherApp:
         items: list[tuple[str, str]] = []
 
         items.append(("plan", "📝 Plan schreiben"))
+        items.append(("start", "▶️  Sitzung starten"))
 
         if not is_empty:
             items.append(("export", "⤴️  Exportieren"))
-            items.append(("browse", "📂 Inhalt von Workspace anzeigen"))
 
         items.append(("import", "⤵️  Importieren"))
 
-        items.append(("start", "▶️  Sitzung starten"))
+        if not is_empty:
+            items.append(("browse", "📂 Inhalt von Workspace anzeigen"))
 
         items.append(("shell", "🖥️  Shell öffnen"))
 

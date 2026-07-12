@@ -639,6 +639,10 @@ class ConfigManager:
                 shutil.copy(self.config_path, backup_path)
             return default_config
 
+    def reload(self) -> None:
+        """Lädt Config neu von Platte, um Änderungen anderer Instanzen zu übernehmen."""
+        self.config = self.load_config()
+
     def save_config(self, config: dict[str, Any] | None = None) -> None:
         """Speichert Config in YAML.
 
@@ -667,6 +671,7 @@ class ConfigManager:
         if history_type not in ["export", "import"]:
             raise ValueError(f"Invalid history_type: {history_type}")
 
+        self.reload()
         history = self.config["history"]
         path_str = str(path.absolute())
 
@@ -702,6 +707,7 @@ class ConfigManager:
 
     def record_reset(self) -> None:
         """Speichert aktuellen Zeitstempel als letzten Reset-Zeitpunkt."""
+        self.reload()
         self.config["last_reset_timestamp"] = datetime.now().isoformat()
         self.save_config()
 
@@ -714,6 +720,7 @@ class ConfigManager:
         Returns:
             Neuer Wert nach dem Toggle.
         """
+        self.reload()
         self.config[key] = not self.config.get(key, False)
         self.save_config()
         return self.config[key]
@@ -1227,7 +1234,7 @@ class LauncherApp:
             True wenn ein Sentinel verarbeitet wurde (Loop soll fortgesetzt werden).
         """
         if result == "__refresh__":
-            self.config_manager.config = self.config_manager.load_config()
+            self.config_manager.reload()
             return True
         if result == "__toggle_ask_reset__":
             self.config_manager.toggle_bool_option("ask_for_reset")
@@ -1325,6 +1332,7 @@ class LauncherApp:
 
     def handle_export(self) -> None:
         """Export-Operation mit Auto-Detect: Single File oder Folder."""
+        self.config_manager.reload()
         if self.workspace_manager.is_empty():
             curses.wrapper(
                 curses_message, "Export", "Workspace ist leer, nichts zu exportieren"
@@ -1387,6 +1395,7 @@ class LauncherApp:
 
     def handle_import(self) -> None:
         """Import-Operation mit Auto-Detect: Single File oder Folder."""
+        self.config_manager.reload()
         source = self.import_path or self.select_path_with_history("import")
         if source is None:
             return

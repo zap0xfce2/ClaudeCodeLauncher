@@ -15,6 +15,7 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 from typing import Any, Literal, overload
+from collections.abc import Callable
 
 # --- Curses Farb-Paar IDs ---
 COLOR_PAIR_CYAN = 1
@@ -38,6 +39,10 @@ MENU_RIGHT_COL_BUFFER = 18
 # --- Dateigrößen ---
 BYTES_PER_KB = 1024
 BYTES_PER_MB = 1024 * 1024
+
+# --- Plan-Idle-Timer ---
+MILLISECONDS_PER_SECOND = 1000
+DEFAULT_PLAN_IDLE_TIMER_DURATION = 10
 
 # --- Einrückung für Listen-Einträge (UI_PADDING_X + "> " Präfix) ---
 ITEM_INDENT_X = UI_PADDING_X + 2  # = 4
@@ -86,6 +91,8 @@ def curses_menu(
     status_text: str,
     menu_items: list[tuple[str, str]],
     default_index: int = 0,
+    idle_timeout_ms: int | None = None,
+    idle_refresh_predicate: Callable[[], bool] | None = None,
 ) -> str | None:
     """Zeigt Hauptmenü mit Banner oben, Menü links und Status-Info rechts.
 
@@ -95,12 +102,23 @@ def curses_menu(
         status_text: Mehrzeiliger Status; letzte Zeile = Footer, Rest = Info rechts.
         menu_items: Liste von (action_key, label) Tuples.
         default_index: Vorausgewählter Menü-Index.
+        idle_timeout_ms: Poll-Intervall in ms für den Idle-Timer, oder None.
+        idle_refresh_predicate: Liefert bei jedem Idle-Tick einen Vergleichswert;
+            ändert sich der Wert gegenüber dem Stand bei Funktionseintritt,
+            wird ein echter Refresh ausgelöst. None = jeder Tick refresht sofort.
 
     Returns:
         Action-Key des gewählten Eintrags, Sentinel-String oder None bei Abbruch.
     """
     _init_curses_colors(stdscr)
     current = default_index
+
+    if idle_timeout_ms is not None:
+        stdscr.timeout(idle_timeout_ms)
+
+    initial_predicate_state = (
+        idle_refresh_predicate() if idle_refresh_predicate is not None else None
+    )
 
     while True:
         stdscr.clear()
@@ -171,7 +189,14 @@ def curses_menu(
 
         key = stdscr.getch()
 
-        if _is_up_key(key):
+        if key == -1:
+            if (
+                idle_refresh_predicate is None
+                or idle_refresh_predicate() != initial_predicate_state
+            ):
+                return "__refresh__"
+            continue
+        elif _is_up_key(key):
             current = (current - 1) % len(menu_items)
         elif _is_down_key(key):
             current = (current + 1) % len(menu_items)
@@ -591,6 +616,8 @@ class ConfigManager:
             "claude_instruction": "",
             "ask_for_reset": True,
             "dont_ask_on_export_overwrite": False,
+            "plan_idle_timer_enabled": True,
+            "plan_idle_timer_duration": DEFAULT_PLAN_IDLE_TIMER_DURATION,
         }
 
         if not self.config_path.exists():
@@ -1096,6 +1123,17 @@ class LauncherApp:
                 return index
         return 0
 
+    def _get_plan_idle_timer_interval_ms(self) -> int | None:
+        """Berechnet das Poll-Intervall in ms für den Plan-Idle-Timer, oder None wenn deaktiviert."""
+        if not self.config_manager.config.get("plan_idle_timer_enabled", True):
+            return None
+        duration_seconds = self.config_manager.config.get(
+            "plan_idle_timer_duration", DEFAULT_PLAN_IDLE_TIMER_DURATION
+        )
+        if not isinstance(duration_seconds, (int, float)) or duration_seconds <= 0:
+            return None
+        return int(duration_seconds * MILLISECONDS_PER_SECOND)
+
     def get_menu_items(self) -> list[tuple[str, str]]:
         """Generiert Menü-Items basierend auf Workspace-Status.
 
@@ -1489,6 +1527,7 @@ class LauncherApp:
                 menu_items = self.get_menu_items()
                 status_text = self._build_status_text(status)
                 default_index = self._get_default_menu_index(menu_items)
+                idle_timeout_ms = self._get_plan_idle_timer_interval_ms()
 
                 try:
                     result = curses.wrapper(
@@ -1497,6 +1536,8 @@ class LauncherApp:
                         status_text,
                         menu_items,
                         default_index,
+                        idle_timeout_ms,
+                        self._plan_swap_file_exists,
                     )
                 except KeyboardInterrupt:
                     print("\nAuf Wiedersehen!")

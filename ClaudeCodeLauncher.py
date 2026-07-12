@@ -1082,6 +1082,20 @@ class LauncherApp:
         self.export_path = export_path
         self.import_path = import_path
 
+    def _plan_swap_file_exists(self) -> bool:
+        """Prüft ob Plan.md gerade in vim geöffnet ist (Swap-Datei .Plan.md.swp vorhanden)."""
+        swap_file = self.workspace_manager.workspace / ".Plan.md.swp"
+        return swap_file.exists()
+
+    def _get_default_menu_index(self, menu_items: list[tuple[str, str]]) -> int:
+        """Setzt den Cursor auf 'Sitzung starten' wenn Plan.md gerade in vim bearbeitet wird."""
+        if not self._plan_swap_file_exists():
+            return 0
+        for index, (action, _label) in enumerate(menu_items):
+            if action == "start":
+                return index
+        return 0
+
     def get_menu_items(self) -> list[tuple[str, str]]:
         """Generiert Menü-Items basierend auf Workspace-Status.
 
@@ -1474,10 +1488,15 @@ class LauncherApp:
                 status = self.workspace_manager.get_status()
                 menu_items = self.get_menu_items()
                 status_text = self._build_status_text(status)
+                default_index = self._get_default_menu_index(menu_items)
 
                 try:
                     result = curses.wrapper(
-                        curses_menu, "Claude Code Launcher", status_text, menu_items, 0
+                        curses_menu,
+                        "Claude Code Launcher",
+                        status_text,
+                        menu_items,
+                        default_index,
                     )
                 except KeyboardInterrupt:
                     print("\nAuf Wiedersehen!")

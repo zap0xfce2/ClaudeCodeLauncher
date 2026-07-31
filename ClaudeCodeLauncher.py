@@ -83,9 +83,10 @@ def _init_curses_colors(stdscr: "curses.window") -> None:
         stdscr: Das Curses Hauptfenster.
     """
     curses.curs_set(0)
-    curses.init_pair(COLOR_PAIR_CYAN, curses.COLOR_CYAN, curses.COLOR_BLACK)
-    curses.init_pair(COLOR_PAIR_YELLOW, curses.COLOR_YELLOW, curses.COLOR_BLACK)
-    curses.init_pair(COLOR_PAIR_GREEN, curses.COLOR_GREEN, curses.COLOR_BLACK)
+    curses.use_default_colors()
+    curses.init_pair(COLOR_PAIR_CYAN, curses.COLOR_CYAN, -1)
+    curses.init_pair(COLOR_PAIR_YELLOW, curses.COLOR_YELLOW, -1)
+    curses.init_pair(COLOR_PAIR_GREEN, curses.COLOR_GREEN, -1)
 
 
 def _is_up_key(key: int) -> bool:

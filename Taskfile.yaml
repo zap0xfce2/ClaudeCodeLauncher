@@ -26,16 +26,14 @@ tasks:
       # Kopie mit gesetzter Version anlegen
       - cp ClaudeCodeLauncher.py _ClaudeCodeLauncher_versioned.py
       - sed -i '' 's/VERSION = "vYYMMDDhhmm"/VERSION = "v{{.BUILD_DATE}}"/' _ClaudeCodeLauncher_versioned.py
-      # Temporäre Spec anlegen die auf die versionierte Kopie zeigt
-      - sed 's/ClaudeCodeLauncher\.py/_ClaudeCodeLauncher_versioned.py/' ClaudeCodeLauncher.spec > _versioned.spec
-      - pyinstaller _versioned.spec >/dev/null 2>&1
+      - uv run python -m nuitka --mode=onefile --output-dir=/tmp/nuitka-build --output-filename=ClaudeCodeLauncher --remove-output --assume-yes-for-downloads --quiet _ClaudeCodeLauncher_versioned.py
 
   install:
     desc: "Installiere das Build"
     cmds:
-      - cp dist/ClaudeCodeLauncher /opt/homebrew/bin
+      - cp /tmp/nuitka-build/ClaudeCodeLauncher /opt/homebrew/bin
 
   post-clean:
     desc: "Entfernt temporäre Build-Kopien"
     cmds:
-      - rm -f _ClaudeCodeLauncher_versioned.py _versioned.spec
+      - rm -f _ClaudeCodeLauncher_versioned.py

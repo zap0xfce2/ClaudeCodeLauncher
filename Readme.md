@@ -20,12 +20,12 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 - `pyyaml >= 6.0.0`
 - `rsync` (für Folder-Export/-Import; auf macOS vorinstalliert)
 - [Task](https://taskfile.dev) (nur für den Build)
-- [PyInstaller](https://pyinstaller.org) (nur für den Build)
+- [uv](https://docs.astral.sh/uv/) (Dependency-Management; installiert auch [Nuitka](https://nuitka.net) für den Build)
 
 ## Installation & Setup
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 ### Binary erstellen (optional)
@@ -34,7 +34,7 @@ pip install -r requirements.txt
 task build
 ```
 
-Erstellt via PyInstaller eine eigenständige Binary unter `/opt/homebrew/bin/ClaudeCodeLauncher`.
+Erstellt via Nuitka eine eigenständige Binary unter `/opt/homebrew/bin/ClaudeCodeLauncher`.
 
 ## Verwendung
 

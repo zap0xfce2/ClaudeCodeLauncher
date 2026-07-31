@@ -8,6 +8,7 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 - **Export / Import** – Workspace als Backup sichern und wiederherstellen (Folder-Modus via `rsync`: Löschungen im Workspace werden ins Exportziel übertragen)
 - **Single-File-Modus** – Einzelne Dateien exportieren oder importieren
 - **History** – Zuletzt verwendete Pfade werden gespeichert und vorgeschlagen
+- **VS-Code-Sprung** – Importquelle (letzter Import-Pfad) direkt in VS Code öffnen
 - **Ignore-Patterns** – Konfigurierbare Filter für Export und Import (z. B. `.git`, `.env`)
 - **Config-Hotkeys** – Optionen direkt im Hauptmenü togglen
 - **Shell-Zugang** – Terminal im Workspace-Verzeichnis öffnen
@@ -19,6 +20,7 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 - Python 3.10+
 - `pyyaml >= 6.0.0`
 - `rsync` (für Folder-Export/-Import; auf macOS vorinstalliert)
+- `code`-CLI von VS Code (optional, nur für „Importquelle in VS Code öffnen")
 - [Task](https://taskfile.dev) (nur für den Build)
 - [uv](https://docs.astral.sh/uv/) (Dependency-Management; installiert auch [Nuitka](https://nuitka.net) für den Build)
 

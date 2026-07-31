@@ -52,6 +52,12 @@ RSYNC_DELETE_EXCLUDED_ARG = "--delete-excluded"
 # --- VS Code CLI (Importquelle öffnen) ---
 VSCODE_BINARY = "code"
 
+# --- Shell / Login-Shell-PATH ---
+DEFAULT_SHELL = "/bin/zsh"
+LOGIN_SHELL_PATH_PROBE_TIMEOUT = 5
+PATH_PROBE_START_MARKER = "__PATH_START__"
+PATH_PROBE_END_MARKER = "__PATH_END__"
+
 # --- Einrückung für Listen-Einträge (UI_PADDING_X + "> " Präfix) ---
 ITEM_INDENT_X = UI_PADDING_X + 2  # = 4
 
@@ -91,6 +97,38 @@ def _is_down_key(key: int, include_tab: bool = True) -> bool:
         True für KEY_DOWN, j oder (wenn include_tab) Tab.
     """
     return key in (curses.KEY_DOWN, ord("j")) or (include_tab and key == KEY_TAB)
+
+
+def _load_login_shell_path() -> str | None:
+    """Liest den PATH aus einer interaktiven Login-Shell des Users.
+
+    Wird der Launcher außerhalb eines Login-Terminals gestartet, erbt er einen
+    reduzierten PATH und Subprozesse finden Befehle wie `code` oder `claude`
+    nicht. Interaktiv + Login, weil PATH-Setup sowohl in ~/.zprofile (Login)
+    als auch in ~/.zshrc (nur interaktiv) liegen kann. Marker isolieren den
+    PATH von stdout-Noise der rc-Dateien.
+
+    Returns:
+        Vollständiger PATH-String oder None wenn die Shell fehlschlägt.
+    """
+    shell = os.environ.get("SHELL", DEFAULT_SHELL)
+    probe_command = (
+        f'printf "{PATH_PROBE_START_MARKER}%s{PATH_PROBE_END_MARKER}" "$PATH"'
+    )
+    try:
+        result = subprocess.run(
+            [shell, "-l", "-i", "-c", probe_command],
+            capture_output=True,
+            text=True,
+            timeout=LOGIN_SHELL_PATH_PROBE_TIMEOUT,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    _, start_found, rest = result.stdout.partition(PATH_PROBE_START_MARKER)
+    path, end_found, _ = rest.partition(PATH_PROBE_END_MARKER)
+    if not start_found or not end_found or not path:
+        return None
+    return path
 
 
 def curses_menu(
@@ -1627,9 +1665,9 @@ class LauncherApp:
         subprocess.run(["vi", str(plan_file)])
 
     def handle_shell(self) -> None:
-        """Öffnet eine Shell im Workspace-Verzeichnis."""
-        shell = os.environ.get("SHELL", "/bin/zsh")
-        subprocess.run([shell], cwd=str(self.workspace_manager.workspace))
+        """Öffnet eine Login-Shell im Workspace-Verzeichnis."""
+        shell = os.environ.get("SHELL", DEFAULT_SHELL)
+        subprocess.run([shell, "-l"], cwd=str(self.workspace_manager.workspace))
 
     def handle_action(self, action: str) -> tuple[bool, bool]:
         """Führt Menü-Aktion aus.
@@ -1727,6 +1765,11 @@ class LauncherApp:
 
 def main() -> None:
     """Haupteinstiegspunkt."""
+    # Reduzierter Start-PATH würde sonst an alle Subprozesse vererbt
+    login_path = _load_login_shell_path()
+    if login_path:
+        os.environ["PATH"] = login_path
+
     parser = argparse.ArgumentParser(
         description="Claude Code Launcher - Interaktiver Session Manager",
         formatter_class=argparse.RawDescriptionHelpFormatter,

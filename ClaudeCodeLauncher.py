@@ -1241,7 +1241,7 @@ class LauncherApp:
             items.append(("export", "⤴️  Exportieren"))
 
         items.append(("import", "⤵️  Importieren"))
-        items.append(("open_import_source", "🧑‍💻 Importquelle in VS Code öffnen"))
+        items.append(("open_import_source", "🧭 Importquelle in VS Code öffnen"))
 
         if not is_empty:
             items.append(("browse", "📂 Inhalt von Workspace anzeigen"))

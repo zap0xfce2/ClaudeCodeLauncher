@@ -217,6 +217,10 @@ def curses_menu(
             return "__toggle_overwrite_ask__"
         elif key == ord("s"):
             return "shell"
+        elif key == ord("e"):
+            return "export_first"
+        elif key == ord("i"):
+            return "import_first"
 
 
 def curses_confirm(
@@ -680,8 +684,13 @@ class ConfigManager:
         history = self.config["history"]
         path_str = str(path.absolute())
 
-        # Duplikate entfernen, dann neuen Eintrag vorne einfügen
-        history = [h for h in history if h.get("path") != path_str]
+        # Duplikate pro (Pfad, Typ) entfernen, dann neuen Eintrag vorne einfügen;
+        # Alt-Einträge ohne type-Feld gelten als Treffer und werden ersetzt
+        history = [
+            h
+            for h in history
+            if h.get("path") != path_str or h.get("type", history_type) != history_type
+        ]
         history.insert(
             0,
             {
@@ -1222,7 +1231,8 @@ class LauncherApp:
         overwrite_ask_str = "Nein" if dont_ask_overwrite else "Ja"
 
         footer = (
-            f"  [r] Refresh  [x] Nach Export zurücksetzen: {ask_reset_str}"
+            f"  [r] Refresh  [e] Export  [i] Import"
+            f"  [x] Nach Export zurücksetzen: {ask_reset_str}"
             f"  [o] Überschreiben bestätigen: {overwrite_ask_str}  [q] Beenden"
         )
 
@@ -1350,6 +1360,66 @@ class LauncherApp:
             items.append((path, f"{icon} {path} ({timestamp})"))
         return items
 
+    def _get_first_history_path(self, history_type: str) -> Path | None:
+        """Liefert den Pfad des ersten History-Eintrags des angegebenen Typs.
+
+        Args:
+            history_type: "export" oder "import".
+
+        Returns:
+            Pfad des neuesten Eintrags dieses Typs (Alt-Einträge ohne type-Feld
+            zählen für beide Typen) oder None wenn keiner existiert.
+        """
+        self.config_manager.reload()
+        history = self.config_manager.config.get("history", [])
+        # Alt-Einträge ohne type-Feld gelten für beide Typen
+        entry = next(
+            (h for h in history if h.get("type", history_type) == history_type), None
+        )
+        if entry is None:
+            return None
+        return Path(entry["path"]).expanduser()
+
+    def handle_export_first(self) -> None:
+        """Export per Hotkey zum ersten Export-Eintrag der History.
+
+        Warnt wenn das Export-Ziel vom letzten Import-Pfad abweicht, um
+        versehentliche Exporte in ein fremdes Projekt zu verhindern
+        (Folder-Export hat Mirror-Semantik, überträgt also auch Löschungen).
+        """
+        destination = self._get_first_history_path("export")
+        if destination is None:
+            curses.wrapper(
+                curses_message, "Export", "Kein Export-Eintrag in der History"
+            )
+            return
+
+        import_path = self._get_first_history_path("import")
+        if import_path != destination:
+            import_str = str(import_path) if import_path else "(kein Import-Eintrag)"
+            confirm = curses.wrapper(
+                curses_confirm,
+                "Export-Ziel weicht vom letzten Import ab!\n"
+                f"Export: {destination}\n"
+                f"Import: {import_str}\n"
+                "Wirklich exportieren?",
+                default=False,
+            )
+            if not confirm:
+                return
+
+        self.handle_export(destination)
+
+    def handle_import_first(self) -> None:
+        """Import per Hotkey vom ersten Import-Eintrag der History."""
+        source = self._get_first_history_path("import")
+        if source is None:
+            curses.wrapper(
+                curses_message, "Import", "Kein Import-Eintrag in der History"
+            )
+            return
+        self.handle_import(source)
+
     def handle_reset(self) -> None:
         """Reset-Operation mit Bestätigung."""
         if self.workspace_manager.is_empty():
@@ -1364,8 +1434,12 @@ class LauncherApp:
             if self.workspace_manager.reset():
                 self.config_manager.record_reset()
 
-    def handle_export(self) -> None:
-        """Export-Operation mit Auto-Detect: Single File oder Folder."""
+    def handle_export(self, destination: Path | None = None) -> None:
+        """Export-Operation mit Auto-Detect: Single File oder Folder.
+
+        Args:
+            destination: Optionales Ziel; None öffnet die Pfad-Auswahl.
+        """
         self.config_manager.reload()
         if self.workspace_manager.is_empty():
             curses.wrapper(
@@ -1373,7 +1447,9 @@ class LauncherApp:
             )
             return
 
-        destination = self.export_path or self.select_path_with_history("export")
+        destination = (
+            destination or self.export_path or self.select_path_with_history("export")
+        )
         if destination is None:
             return
 
@@ -1427,10 +1503,14 @@ class LauncherApp:
         if success:
             self.config_manager.add_to_history(destination, "export")
 
-    def handle_import(self) -> None:
-        """Import-Operation mit Auto-Detect: Single File oder Folder."""
+    def handle_import(self, source: Path | None = None) -> None:
+        """Import-Operation mit Auto-Detect: Single File oder Folder.
+
+        Args:
+            source: Optionale Quelle; None öffnet die Pfad-Auswahl.
+        """
         self.config_manager.reload()
-        source = self.import_path or self.select_path_with_history("import")
+        source = source or self.import_path or self.select_path_with_history("import")
         if source is None:
             return
 
@@ -1543,6 +1623,10 @@ class LauncherApp:
             self.handle_export()
         elif action == "import":
             self.handle_import()
+        elif action == "export_first":
+            self.handle_export_first()
+        elif action == "import_first":
+            self.handle_import_first()
         elif action == "browse":
             self.handle_browse()
         elif action == "plan":

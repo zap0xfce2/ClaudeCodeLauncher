@@ -7,3 +7,4 @@ Plan.md
 .Plan.md.swp
 __pycache__
 .venv
+.ruff_cache

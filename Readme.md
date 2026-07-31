@@ -4,7 +4,7 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 
 ## Features
 
-- **Session-Management** – Neue Session starten oder bestehende fortsetzen
+- **Session-Management** – Neue Session im Workspace starten
 - **Export / Import** – Workspace als Backup sichern und wiederherstellen (Folder-Modus via `rsync`: Löschungen im Workspace werden ins Exportziel übertragen)
 - **Single-File-Modus** – Einzelne Dateien exportieren oder importieren
 - **History** – Zuletzt verwendete Pfade werden gespeichert und vorgeschlagen
@@ -94,7 +94,7 @@ Die Datei `config.yaml` wird automatisch im Script-Verzeichnis erstellt und kann
 | `export_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Export übersprungen werden; passende Einträge im Exportziel (z. B. dessen `.git`/`.env`) bleiben unangetastet |
 | `import_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Import übersprungen werden                                        |
 | `claude_env`                   | Dict   | `{}`     | Umgebungsvariablen für Claude beim Start (z. B. `{ANTHROPIC_MODEL: "claude-opus-4-6"}`) |
-| `claude_instruction`           | string | `""`     | Anweisung, die beim Start/Fortsetzen automatisch als erster Prompt an Claude übergeben wird (leer = keine) |
+| `claude_instruction`           | string | `""`     | Anweisung, die beim Start automatisch als erster Prompt an Claude übergeben wird (leer = keine) |
 | `ask_for_reset`                | bool   | `true`   | Nach Folder-Export: Fragen ob Workspace zurückgesetzt werden soll                       |
 | `dont_ask_on_export_overwrite` | bool   | `false`  | Überschreib-Bestätigung beim Export unterdrücken                                        |
 | `plan_idle_timer_enabled`      | bool   | `true`   | Automatischer Menü-Refresh bei Änderung von `.Plan.md.swp` (nur Hauptmenü). Kein Hotkey, nur `config.yaml` |
@@ -125,6 +125,8 @@ export_ignore_patterns:
 | `Enter` / `Space`     | Auswählen                              |
 | `r`                   | Status aktualisieren                   |
 | `s`                   | Shell direkt öffnen                    |
+| `e`                   | Export zum ersten Export-History-Eintrag (warnt, wenn der Pfad vom letzten Import abweicht) |
+| `i`                   | Import vom ersten Import-History-Eintrag (mit bestehender Lösch-Rückfrage) |
 | `x`                   | `ask_for_reset` togglen                |
 | `o`                   | `dont_ask_on_export_overwrite` togglen |
 | `q`                   | Beenden                                |
@@ -136,8 +138,8 @@ export_ignore_patterns:
 | `←` / `→` / `h` / `l` | Zwischen Ja/Nein wechseln |
 | `Tab`                 | Zwischen Ja/Nein wechseln |
 | `Enter` / `Space`     | Bestätigen                |
-| `y`                   | Direkt Ja                 |
-| `j` / `n`             | Direkt Nein               |
+| `y` / `j`             | Direkt Ja                 |
+| `n`                   | Direkt Nein               |
 | `ESC`                 | Abbrechen (= Nein)        |
 
 ### Listen-Auswahl

@@ -17,7 +17,7 @@ tasks:
   pre-clean:
     desc: "Bereinige vorherige Builds"
     cmds:
-      - rm -rf {{.BUILD_DIR}}
+      - rm -rf build dist __pycache__ {{.BUILD_DIR}}
       - rm -rf /opt/homebrew/bin/ClaudeCodeLauncher
 
   build:

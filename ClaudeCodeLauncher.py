@@ -448,6 +448,8 @@ def curses_menu(
             return "export_first"
         elif key == ord("i"):
             return "import_first"
+        elif key == ord("v"):
+            return "open_import_source"
 
 
 def curses_confirm(
@@ -1459,7 +1461,7 @@ class LauncherApp:
         overwrite_ask_str = "Nein" if dont_ask_overwrite else "Ja"
 
         footer = (
-            f"  [r] Refresh  [e] Export  [i] Import"
+            f"  [r] Refresh  [e] Export  [i] Import  [v] VS Code"
             f"  [x] Nach Export zurücksetzen: {ask_reset_str}"
             f"  [o] Überschreiben bestätigen: {overwrite_ask_str}  [q] Beenden"
         )

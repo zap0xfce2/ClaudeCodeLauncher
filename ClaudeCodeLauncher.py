@@ -13,7 +13,7 @@ import yaml
 import curses
 import subprocess
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Literal, overload
 from collections.abc import Callable
 
@@ -34,9 +34,11 @@ MENU_TITLE_ROW = 1
 MENU_SEPARATOR_ROW = 2
 MENU_START_ROW = 4
 UI_PADDING_X = 2
-MENU_RIGHT_COL_BUFFER = 18
+MENU_RIGHT_COL_BUFFER = 10
 MENU_COLUMN_GAP_X = 4          # Abstand zwischen Menüspalte 1 und Spalte 2
 MENU_ITEM_PREFIX_WIDTH = 2     # Breite von "> " bzw. "  " Präfix vor jedem Label
+USAGE_STATS_COL_WIDTH = 26     # Reservierte Breite für die Claude-Nutzungsstatistik-Spalte ganz rechts
+USAGE_STATS_MIN_GAP = MENU_COLUMN_GAP_X
 
 # Spalten-Zuordnung für curses_menu(); muss mit Action-Keys aus LauncherApp.get_menu_items() übereinstimmen.
 WORKFLOW_ACTIONS = frozenset({"plan", "start", "export", "import"})
@@ -62,6 +64,13 @@ DEFAULT_SHELL = "/bin/zsh"
 LOGIN_SHELL_PATH_PROBE_TIMEOUT = 5
 PATH_PROBE_START_MARKER = "__PATH_START__"
 PATH_PROBE_END_MARKER = "__PATH_END__"
+
+# --- openusage CLI (Claude-Nutzungsstatistik) ---
+OPENUSAGE_BINARY = "openusage"
+OPENUSAGE_PROVIDER = "claude"
+OPENUSAGE_FETCH_TIMEOUT = 3
+MINUTES_PER_HOUR = 60
+MINUTES_PER_DAY = 1440
 
 # --- Einrückung für Listen-Einträge (UI_PADDING_X + "> " Präfix) ---
 ITEM_INDENT_X = UI_PADDING_X + 2  # = 4
@@ -233,6 +242,52 @@ def _load_login_shell_path() -> str | None:
     return path
 
 
+def _fetch_claude_usage_stats() -> dict[str, Any] | None:
+    """Liest Claude-Nutzungsdaten von der openusage-CLI (falls installiert).
+
+    Returns:
+        Dict mit Keys "session" und "weekly" (je Resource-Dict aus dem
+        openusage.limits.v1-Schema), oder None wenn openusage fehlt,
+        fehlschlägt oder unerwartete Daten liefert.
+    """
+    try:
+        result = subprocess.run(
+            [OPENUSAGE_BINARY, OPENUSAGE_PROVIDER],
+            capture_output=True,
+            text=True,
+            timeout=OPENUSAGE_FETCH_TIMEOUT,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    try:
+        resources = json.loads(result.stdout)["providers"][OPENUSAGE_PROVIDER]["resources"]
+        return {"session": resources["session"], "weekly": resources["weekly"]}
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return None
+
+
+def _format_relative_reset(reset_iso: str) -> str:
+    """Formatiert einen ISO-Zeitstempel als relative Restzeit (z. B. "4d23h", "1h15m", "15m").
+
+    Args:
+        reset_iso: ISO-8601-Zeitstempel, ggf. mit "Z"-Suffix (UTC).
+
+    Returns:
+        Relative Restzeit bis zum Zeitstempel, "0m" falls bereits abgelaufen.
+    """
+    reset_dt = datetime.fromisoformat(reset_iso.replace("Z", "+00:00"))
+    total_minutes = max(int((reset_dt - datetime.now(timezone.utc)).total_seconds() // 60), 0)
+    days, rem_minutes = divmod(total_minutes, MINUTES_PER_DAY)
+    hours, minutes = divmod(rem_minutes, MINUTES_PER_HOUR)
+    if days:
+        return f"{days}d{hours}h"
+    if hours:
+        return f"{hours}h{minutes}m"
+    return f"{minutes}m"
+
+
 def curses_menu(
     stdscr: "curses.window",
     banner_text: str,
@@ -241,6 +296,7 @@ def curses_menu(
     default_index: int = 0,
     idle_timeout_ms: int | None = None,
     idle_refresh_predicate: Callable[[], bool] | None = None,
+    usage_stats_text: str | None = None,
 ) -> str | None:
     """Zeigt Hauptmenü mit Banner oben, Menü in zwei Spalten links und Status-Info rechts.
 
@@ -254,6 +310,8 @@ def curses_menu(
         idle_refresh_predicate: Liefert bei jedem Idle-Tick einen Vergleichswert;
             ändert sich der Wert gegenüber dem Stand bei Funktionseintritt,
             wird ein echter Refresh ausgelöst. None = jeder Tick refresht sofort.
+        usage_stats_text: Mehrzeiliger Text für die Claude-Nutzungsstatistik-Spalte
+            ganz rechts (openusage-CLI), oder None wenn keine Daten verfügbar sind.
 
     Returns:
         Action-Key des gewählten Eintrags, Sentinel-String oder None bei Abbruch.
@@ -292,6 +350,14 @@ def curses_menu(
             status_anchor_x + status_anchor_width + MENU_ITEM_PREFIX_WIDTH + MENU_RIGHT_COL_BUFFER
         )
 
+        # Claude-Nutzungsstatistik-Spalte ganz rechts, an Terminalbreite verankert
+        usage_col_x = width - USAGE_STATS_COL_WIDTH
+        show_usage_col = (
+            usage_stats_text is not None
+            and usage_col_x < width
+            and usage_col_x - right_col >= USAGE_STATS_MIN_GAP
+        )
+
         # Titel links, Versionsnummer rechts
         stdscr.addstr(
             MENU_TITLE_ROW,
@@ -315,14 +381,28 @@ def curses_menu(
             _render_menu_column(stdscr, col2, current, col2_x, height)
 
         # Status-Info (rechts, neben den ersten Menü-Zeilen)
+        status_right_boundary = (
+            usage_col_x - MENU_COLUMN_GAP_X if show_usage_col else width - UI_PADDING_X
+        )
         for i, line in enumerate(info_lines):
             y = MENU_START_ROW + i
             if y >= height - 2 or right_col >= width:
                 break
-            max_len = width - right_col - UI_PADDING_X
+            max_len = status_right_boundary - right_col
             stdscr.addstr(
                 y, right_col, line[:max_len], curses.color_pair(COLOR_PAIR_YELLOW)
             )
+
+        # Claude-Nutzungsstatistik (rechts außen, openusage-CLI)
+        if show_usage_col:
+            for i, line in enumerate(usage_stats_text.split("\n")):
+                y = MENU_START_ROW + i
+                if y >= height - 2:
+                    break
+                max_len = width - usage_col_x - UI_PADDING_X
+                stdscr.addstr(
+                    y, usage_col_x, line.strip()[:max_len], curses.color_pair(COLOR_PAIR_GREEN)
+                )
 
         # Footer (unterste Zeile, kein Rahmen)
         if height > 3:
@@ -1415,6 +1495,28 @@ class LauncherApp:
             return f"   Letzter Export: {export_ts.strftime('%d.%m.%Y %H:%M')}\n"
         return ""
 
+    @staticmethod
+    def _build_usage_stats_text(usage: dict[str, Any] | None) -> str | None:
+        """Baut den Text für die Claude-Nutzungsstatistik-Spalte (openusage-CLI).
+
+        Args:
+            usage: Ergebnis von _fetch_claude_usage_stats() oder None.
+
+        Returns:
+            Dreizeiliger Status-String oder None wenn keine Daten verfügbar sind.
+        """
+        if usage is None:
+            return None
+        session = usage["session"]
+        weekly = usage["weekly"]
+        session_reset = _format_relative_reset(session["resetsAt"])
+        weekly_reset = _format_relative_reset(weekly["resetsAt"])
+        return (
+            f"⚡ Claude Nutzung\n"
+            f"Session {session['used']}% · {session_reset}\n"
+            f"Weekly  {weekly['used']}% · {weekly_reset}"
+        )
+
     def _handle_sentinel(self, result: str) -> bool:
         """Verarbeitet Sentinel-Rückgaben aus dem Menü (Refresh, Toggle-Hotkeys).
 
@@ -1825,6 +1927,7 @@ class LauncherApp:
                 status_text = self._build_status_text(status)
                 default_index = self._get_default_menu_index(menu_items)
                 idle_timeout_ms = self._get_plan_idle_timer_interval_ms()
+                usage_stats_text = self._build_usage_stats_text(_fetch_claude_usage_stats())
 
                 try:
                     result = curses.wrapper(
@@ -1835,6 +1938,7 @@ class LauncherApp:
                         default_index,
                         idle_timeout_ms,
                         self._plan_swap_file_exists,
+                        usage_stats_text,
                     )
                 except KeyboardInterrupt:
                     print("\nAuf Wiedersehen!")

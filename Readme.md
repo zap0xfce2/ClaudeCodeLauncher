@@ -129,6 +129,7 @@ export_ignore_patterns:
 | `s`                   | Shell direkt öffnen                    |
 | `e`                   | Export zum ersten Export-History-Eintrag (warnt, wenn der Pfad vom letzten Import abweicht) |
 | `i`                   | Import vom ersten Import-History-Eintrag (mit bestehender Lösch-Rückfrage) |
+| `v`                   | Importquelle in VS Code öffnen         |
 | `x`                   | `ask_for_reset` togglen                |
 | `o`                   | `dont_ask_on_export_overwrite` togglen |
 | `q`                   | Beenden                                |

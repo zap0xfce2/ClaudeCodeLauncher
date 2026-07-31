@@ -2,6 +2,9 @@ version: "3"
 
 silent: true
 
+vars:
+  BUILD_DIR: /tmp/nuitka-build
+
 tasks:
   default:
     desc: "Bauen & Installieren"
@@ -14,7 +17,7 @@ tasks:
   pre-clean:
     desc: "Bereinige vorherige Builds"
     cmds:
-      - rm -rf build dist __pycache__
+      - rm -rf {{.BUILD_DIR}}
       - rm -rf /opt/homebrew/bin/ClaudeCodeLauncher
 
   build:
@@ -23,17 +26,18 @@ tasks:
       BUILD_DATE:
         sh: date +%y%m%d%H%M
     cmds:
-      # Kopie mit gesetzter Version anlegen
-      - cp ClaudeCodeLauncher.py _ClaudeCodeLauncher_versioned.py
-      - sed -i '' 's/VERSION = "vYYMMDDhhmm"/VERSION = "v{{.BUILD_DATE}}"/' _ClaudeCodeLauncher_versioned.py
-      - uv run python -m nuitka --mode=onefile --output-dir=/tmp/nuitka-build --output-filename=ClaudeCodeLauncher --remove-output --assume-yes-for-downloads --quiet _ClaudeCodeLauncher_versioned.py
+      # Kopie mit gesetzter Version im tmp-Verzeichnis anlegen (keine Schreibzugriffe aufs Netzlaufwerk)
+      - mkdir -p {{.BUILD_DIR}}
+      - cp ClaudeCodeLauncher.py {{.BUILD_DIR}}/_ClaudeCodeLauncher_versioned.py
+      - sed -i '' 's/VERSION = "vYYMMDDhhmm"/VERSION = "v{{.BUILD_DATE}}"/' {{.BUILD_DIR}}/_ClaudeCodeLauncher_versioned.py
+      - uv run python -m nuitka --mode=onefile --output-dir={{.BUILD_DIR}} --output-filename=ClaudeCodeLauncher --remove-output --assume-yes-for-downloads --quiet {{.BUILD_DIR}}/_ClaudeCodeLauncher_versioned.py
 
   install:
     desc: "Installiere das Build"
     cmds:
-      - cp /tmp/nuitka-build/ClaudeCodeLauncher /opt/homebrew/bin
+      - cp {{.BUILD_DIR}}/ClaudeCodeLauncher /opt/homebrew/bin
 
   post-clean:
-    desc: "Entfernt temporäre Build-Kopien"
+    desc: "Entfernt temporäres Build-Verzeichnis"
     cmds:
-      - rm -f _ClaudeCodeLauncher_versioned.py
+      - rm -rf {{.BUILD_DIR}}

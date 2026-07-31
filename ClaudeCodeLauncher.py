@@ -49,6 +49,9 @@ RSYNC_BINARY = "rsync"
 RSYNC_BASE_ARGS = ["-a", "--delete"]
 RSYNC_DELETE_EXCLUDED_ARG = "--delete-excluded"
 
+# --- VS Code CLI (Importquelle öffnen) ---
+VSCODE_BINARY = "code"
+
 # --- Einrückung für Listen-Einträge (UI_PADDING_X + "> " Präfix) ---
 ITEM_INDENT_X = UI_PADDING_X + 2  # = 4
 
@@ -1200,6 +1203,7 @@ class LauncherApp:
             items.append(("export", "⤴️  Exportieren"))
 
         items.append(("import", "⤵️  Importieren"))
+        items.append(("open_import_source", "🧑‍💻 Importquelle in VS Code öffnen"))
 
         if not is_empty:
             items.append(("browse", "📂 Inhalt von Workspace anzeigen"))
@@ -1420,6 +1424,27 @@ class LauncherApp:
             return
         self.handle_import(source)
 
+    def handle_open_import_source(self) -> None:
+        """Öffnet den ersten Import-Eintrag der History in VS Code."""
+        source = self._get_first_history_path("import")
+        if source is None:
+            curses.wrapper(
+                curses_message, "VS Code", "Kein Import-Eintrag in der History"
+            )
+            return
+        if not source.exists():
+            curses.wrapper(curses_message, "VS Code", f"Pfad existiert nicht: {source}")
+            return
+        try:
+            subprocess.run([VSCODE_BINARY, str(source)])
+        except FileNotFoundError:
+            curses.wrapper(
+                curses_message,
+                "VS Code",
+                "code-Kommando nicht gefunden – in VS Code "
+                "„Shell Command: Install 'code' command in PATH“ ausführen",
+            )
+
     def handle_reset(self) -> None:
         """Reset-Operation mit Bestätigung."""
         if self.workspace_manager.is_empty():
@@ -1627,6 +1652,8 @@ class LauncherApp:
             self.handle_export_first()
         elif action == "import_first":
             self.handle_import_first()
+        elif action == "open_import_source":
+            self.handle_open_import_source()
         elif action == "browse":
             self.handle_browse()
         elif action == "plan":

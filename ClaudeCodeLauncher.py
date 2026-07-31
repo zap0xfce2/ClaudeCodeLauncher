@@ -44,6 +44,11 @@ BYTES_PER_MB = 1024 * 1024
 MILLISECONDS_PER_SECOND = 1000
 DEFAULT_PLAN_IDLE_TIMER_DURATION = 10
 
+# --- rsync (Folder-Mode Export/Import) ---
+RSYNC_BINARY = "rsync"
+RSYNC_BASE_ARGS = ["-a", "--delete"]
+RSYNC_DELETE_EXCLUDED_ARG = "--delete-excluded"
+
 # --- Einrückung für Listen-Einträge (UI_PADDING_X + "> " Präfix) ---
 ITEM_INDENT_X = UI_PADDING_X + 2  # = 4
 
@@ -833,21 +838,53 @@ class WorkspaceManager:
         else:
             self.workspace.mkdir(parents=True, exist_ok=True)
 
-    def _get_ignore_arg(self, pattern_key: str) -> Any | None:
-        """Gibt shutil.ignore_patterns-Argument zurück, falls Patterns konfiguriert.
+    def _get_exclude_args(self, pattern_key: str) -> list[str]:
+        """Baut rsync --exclude-Argumente aus den konfigurierten Ignore-Patterns.
 
         Args:
             pattern_key: Config-Schlüssel für die Patterns.
 
         Returns:
-            shutil.ignore_patterns(...) oder None.
+            Liste von "--exclude=<pattern>"-Argumenten (leer wenn keine Patterns).
         """
         patterns = (
             self.config_manager.config.get(pattern_key, [])
             if self.config_manager
             else []
         )
-        return shutil.ignore_patterns(*patterns) if patterns else None
+        return [f"--exclude={pattern}" for pattern in patterns]
+
+    def _rsync_mirror(
+        self,
+        source: Path,
+        destination: Path,
+        pattern_key: str,
+        delete_excluded: bool,
+    ) -> None:
+        """Spiegelt source nach destination via rsync (überträgt auch Löschungen).
+
+        Args:
+            source: Quell-Verzeichnis (Inhalt wird kopiert).
+            destination: Ziel-Verzeichnis (wird bei Bedarf erstellt).
+            pattern_key: Config-Schlüssel für die Ignore-Patterns.
+            delete_excluded: True löscht auch excluded Einträge im Ziel,
+                False lässt sie unangetastet.
+
+        Raises:
+            OSError: Wenn rsync fehlt oder mit Fehler endet.
+        """
+        cmd = [RSYNC_BINARY, *RSYNC_BASE_ARGS]
+        if delete_excluded:
+            cmd.append(RSYNC_DELETE_EXCLUDED_ARG)
+        cmd.extend(self._get_exclude_args(pattern_key))
+        cmd.extend([f"{source}/", str(destination)])
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+        except FileNotFoundError as e:
+            raise OSError("rsync wurde nicht gefunden (Installation prüfen)") from e
+        if result.returncode != 0:
+            stderr = result.stderr.strip() or "unbekannter Fehler"
+            raise OSError(f"rsync fehlgeschlagen (Exit {result.returncode}): {stderr}")
 
     @staticmethod
     def _is_file_ignored(filename: str, patterns: list[str]) -> str | None:
@@ -883,7 +920,7 @@ class WorkspaceManager:
             return True
         return curses.wrapper(
             curses_confirm,
-            f"Das Ziel ({destination}) existiert bereits.\nDateien hinzufügen / überschreiben?",
+            f"Das Ziel ({destination}) existiert bereits.\nZiel wird synchronisiert – überzählige Dateien im Ziel werden gelöscht!\nFortfahren?",
             default=False,
         )
 
@@ -927,11 +964,12 @@ class WorkspaceManager:
             if destination.exists() and not self._confirm_overwrite(destination):
                 return False
 
-            ignore_arg = self._get_ignore_arg("export_ignore_patterns")
-            kwargs: dict[str, Any] = {"dirs_exist_ok": True}
-            if ignore_arg:
-                kwargs["ignore"] = ignore_arg
-            shutil.copytree(self.workspace, destination, **kwargs)
+            self._rsync_mirror(
+                self.workspace,
+                destination,
+                "export_ignore_patterns",
+                delete_excluded=False,
+            )
 
             print(f"✓ Erfolgreich exportiert nach: {destination}")
 
@@ -1071,13 +1109,9 @@ class WorkspaceManager:
                 if not confirm:
                     return False
 
-            self._clear_directory()
-
-            ignore_arg = self._get_ignore_arg("import_ignore_patterns")
-            kwargs: dict[str, Any] = {"dirs_exist_ok": True}
-            if ignore_arg:
-                kwargs["ignore"] = ignore_arg
-            shutil.copytree(source, self.workspace, **kwargs)
+            self._rsync_mirror(
+                source, self.workspace, "import_ignore_patterns", delete_excluded=True
+            )
 
             print(f"✓ Erfolgreich importiert von: {source}")
             return True

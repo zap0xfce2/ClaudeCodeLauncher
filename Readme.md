@@ -5,7 +5,7 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 ## Features
 
 - **Session-Management** – Neue Session starten oder bestehende fortsetzen
-- **Export / Import** – Workspace als Backup sichern und wiederherstellen
+- **Export / Import** – Workspace als Backup sichern und wiederherstellen (Folder-Modus via `rsync`: Löschungen im Workspace werden ins Exportziel übertragen)
 - **Single-File-Modus** – Einzelne Dateien exportieren oder importieren
 - **History** – Zuletzt verwendete Pfade werden gespeichert und vorgeschlagen
 - **Ignore-Patterns** – Konfigurierbare Filter für Export und Import (z. B. `.git`, `.env`)
@@ -18,6 +18,7 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 
 - Python 3.10+
 - `pyyaml >= 6.0.0`
+- `rsync` (für Folder-Export/-Import; auf macOS vorinstalliert)
 - [Task](https://taskfile.dev) (nur für den Build)
 - [PyInstaller](https://pyinstaller.org) (nur für den Build)
 
@@ -90,7 +91,7 @@ Die Datei `config.yaml` wird automatisch im Script-Verzeichnis erstellt und kann
 | ------------------------------ | ------ | -------- | --------------------------------------------------------------------------------------- |
 | `max_history_entries`          | int    | `10`     | Maximale Anzahl an History-Einträgen                                                    |
 | `history`                      | Liste  | `[]`     | Gespeicherte Export/Import-Pfade mit Timestamps                                         |
-| `export_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Export übersprungen werden                                        |
+| `export_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Export übersprungen werden; passende Einträge im Exportziel (z. B. dessen `.git`/`.env`) bleiben unangetastet |
 | `import_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Import übersprungen werden                                        |
 | `claude_env`                   | Dict   | `{}`     | Umgebungsvariablen für Claude beim Start (z. B. `{ANTHROPIC_MODEL: "claude-opus-4-6"}`) |
 | `claude_instruction`           | string | `""`     | Anweisung, die beim Start/Fortsetzen automatisch als erster Prompt an Claude übergeben wird (leer = keine) |

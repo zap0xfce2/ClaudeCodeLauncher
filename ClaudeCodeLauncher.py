@@ -35,6 +35,11 @@ MENU_SEPARATOR_ROW = 2
 MENU_START_ROW = 4
 UI_PADDING_X = 2
 MENU_RIGHT_COL_BUFFER = 18
+MENU_COLUMN_GAP_X = 4          # Abstand zwischen Menüspalte 1 und Spalte 2
+MENU_ITEM_PREFIX_WIDTH = 2     # Breite von "> " bzw. "  " Präfix vor jedem Label
+
+# Spalten-Zuordnung für curses_menu(); muss mit Action-Keys aus LauncherApp.get_menu_items() übereinstimmen.
+WORKFLOW_ACTIONS = frozenset({"plan", "start", "export", "import"})
 
 # --- Dateigrößen ---
 BYTES_PER_KB = 1024
@@ -99,6 +104,103 @@ def _is_down_key(key: int, include_tab: bool = True) -> bool:
     return key in (curses.KEY_DOWN, ord("j")) or (include_tab and key == KEY_TAB)
 
 
+def _is_left_key(key: int) -> bool:
+    """Prüft ob key eine Links-Navigation auslöst.
+
+    Args:
+        key: Curses-Tastencode.
+
+    Returns:
+        True für KEY_LEFT oder h.
+    """
+    return key in (curses.KEY_LEFT, ord("h"))
+
+
+def _is_right_key(key: int) -> bool:
+    """Prüft ob key eine Rechts-Navigation auslöst.
+
+    Args:
+        key: Curses-Tastencode.
+
+    Returns:
+        True für KEY_RIGHT oder l.
+    """
+    return key in (curses.KEY_RIGHT, ord("l"))
+
+
+def _split_menu_columns(
+    menu_items: list[tuple[str, str]],
+) -> tuple[list[tuple[int, str]], list[tuple[int, str]]]:
+    """Teilt Menü-Items anhand WORKFLOW_ACTIONS in zwei Spalten auf.
+
+    Args:
+        menu_items: Liste von (action_key, label) Tuples in Original-Reihenfolge.
+
+    Returns:
+        (col1, col2): je eine Liste von (original_index, label) Tuples;
+        original_index verweist auf die Position in menu_items.
+    """
+    col1: list[tuple[int, str]] = []
+    col2: list[tuple[int, str]] = []
+    for i, (action, label) in enumerate(menu_items):
+        target = col1 if action in WORKFLOW_ACTIONS else col2
+        target.append((i, label))
+    return col1, col2
+
+
+def _swap_menu_column(
+    current: int,
+    col1: list[tuple[int, str]],
+    col2: list[tuple[int, str]],
+) -> int:
+    """Wechselt current in die jeweils andere Spalte, möglichst gleiche Zeile.
+
+    Args:
+        current: Aktueller Original-Index in menu_items.
+        col1: Erste Spalte als (original_index, label) Tuples.
+        col2: Zweite Spalte als (original_index, label) Tuples.
+
+    Returns:
+        Original-Index des Ziel-Eintrags; unverändertes current falls
+        die Zielspalte leer ist.
+    """
+    for row, (original_index, _label) in enumerate(col1):
+        if original_index == current and col2:
+            return col2[min(row, len(col2) - 1)][0]
+    for row, (original_index, _label) in enumerate(col2):
+        if original_index == current and col1:
+            return col1[min(row, len(col1) - 1)][0]
+    return current
+
+
+def _render_menu_column(
+    stdscr: "curses.window",
+    column: list[tuple[int, str]],
+    current: int,
+    x: int,
+    height: int,
+) -> None:
+    """Rendert eine Menüspalte an X-Position x, highlightet den aktiven Eintrag.
+
+    Args:
+        stdscr: Das Curses Hauptfenster.
+        column: (original_index, label) Tuples dieser Spalte.
+        current: Global aktuell gewählter Original-Index (für Highlight).
+        x: X-Startposition der Spalte.
+        height: Terminalhöhe (für Sichtbarkeits-Check).
+    """
+    for row, (original_index, label) in enumerate(column):
+        y = MENU_START_ROW + row
+        if y >= height - 2:
+            break
+        if original_index == current:
+            stdscr.addstr(
+                y, x, f"> {label}", curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD
+            )
+        else:
+            stdscr.addstr(y, x, f"  {label}")
+
+
 def _load_login_shell_path() -> str | None:
     """Liest den PATH aus einer interaktiven Login-Shell des Users.
 
@@ -140,7 +242,7 @@ def curses_menu(
     idle_timeout_ms: int | None = None,
     idle_refresh_predicate: Callable[[], bool] | None = None,
 ) -> str | None:
-    """Zeigt Hauptmenü mit Banner oben, Menü links und Status-Info rechts.
+    """Zeigt Hauptmenü mit Banner oben, Menü in zwei Spalten links und Status-Info rechts.
 
     Args:
         stdscr: Das Curses Hauptfenster.
@@ -175,9 +277,20 @@ def curses_menu(
         footer = status_lines[-1].strip() if status_lines else ""
         info_lines = [line.strip() for line in status_lines[:-1]]
 
-        # Rechte Spalte dynamisch: längster Label + Prefix + Puffer für Emoji + Abstand
-        max_label_len = max(len(label) for _, label in menu_items) if menu_items else 20
-        right_col = UI_PADDING_X + 2 + max_label_len + MENU_RIGHT_COL_BUFFER
+        # Menü in zwei Spalten aufteilen (inhaltliche Gruppierung, siehe WORKFLOW_ACTIONS)
+        col1, col2 = _split_menu_columns(menu_items)
+        col1_label_width = max((len(label) for _, label in col1), default=0)
+        col2_label_width = max((len(label) for _, label in col2), default=0)
+
+        col1_x = UI_PADDING_X
+        col2_x = col1_x + col1_label_width + MENU_ITEM_PREFIX_WIDTH + MENU_COLUMN_GAP_X
+
+        # Rechte Spalte dynamisch: an rechte Menüspalte anschließen + Puffer für Emoji + Abstand
+        status_anchor_x = col2_x if col2 else col1_x
+        status_anchor_width = col2_label_width if col2 else col1_label_width
+        right_col = (
+            status_anchor_x + status_anchor_width + MENU_ITEM_PREFIX_WIDTH + MENU_RIGHT_COL_BUFFER
+        )
 
         # Titel links, Versionsnummer rechts
         stdscr.addstr(
@@ -196,20 +309,10 @@ def curses_menu(
             MENU_SEPARATOR_ROW, UI_PADDING_X, sep, curses.color_pair(COLOR_PAIR_CYAN)
         )
 
-        # Menü (links)
-        for i, (_, label) in enumerate(menu_items):
-            y = MENU_START_ROW + i
-            if y >= height - 2:
-                break
-            if i == current:
-                stdscr.addstr(
-                    y,
-                    UI_PADDING_X,
-                    f"> {label}",
-                    curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD,
-                )
-            else:
-                stdscr.addstr(y, UI_PADDING_X, f"  {label}")
+        # Menü (zwei Spalten links)
+        _render_menu_column(stdscr, col1, current, col1_x, height)
+        if col2_x < width:
+            _render_menu_column(stdscr, col2, current, col2_x, height)
 
         # Status-Info (rechts, neben den ersten Menü-Zeilen)
         for i, line in enumerate(info_lines):
@@ -246,6 +349,8 @@ def curses_menu(
             current = (current - 1) % len(menu_items)
         elif _is_down_key(key):
             current = (current + 1) % len(menu_items)
+        elif _is_left_key(key) or _is_right_key(key):
+            current = _swap_menu_column(current, col1, col2)
         elif key == ord("\n") or key == KEY_SPACE:
             return menu_items[current][0]
         elif key == ord("q"):

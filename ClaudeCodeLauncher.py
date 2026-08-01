@@ -1984,32 +1984,13 @@ class LauncherApp:
         return Path(entry["path"]).expanduser()
 
     def handle_export_first(self) -> None:
-        """Export per Hotkey zum ersten Export-Eintrag der History.
-
-        Warnt wenn das Export-Ziel vom letzten Import-Pfad abweicht, um
-        versehentliche Exporte in ein fremdes Projekt zu verhindern
-        (Folder-Export hat Mirror-Semantik, überträgt also auch Löschungen).
-        """
+        """Export per Hotkey zum ersten Export-Eintrag der History."""
         destination = self._get_first_history_path("export")
         if destination is None:
             curses.wrapper(
                 curses_message, "Export", "Kein Export-Eintrag in der History"
             )
             return
-
-        import_path = self._get_first_history_path("import")
-        if import_path != destination:
-            import_str = str(import_path) if import_path else "(kein Import-Eintrag)"
-            confirm = curses.wrapper(
-                curses_confirm,
-                "Export-Ziel weicht vom letzten Import ab!\n"
-                f"Export: {destination}\n"
-                f"Import: {import_str}\n"
-                "Wirklich exportieren?",
-                default=False,
-            )
-            if not confirm:
-                return
 
         self.handle_export(destination)
 
@@ -2058,6 +2039,32 @@ class LauncherApp:
             if self.workspace_manager.reset():
                 self.config_manager.record_reset()
 
+    def _confirm_export_target(self, destination: Path) -> bool:
+        """Warnt wenn destination vom letzten Import-Pfad abweicht.
+
+        Verhindert versehentliche Exporte in ein fremdes Projekt (Folder-Export
+        hat Mirror-Semantik, überträgt also auch Löschungen).
+
+        Args:
+            destination: Aufgelöstes Export-Ziel.
+
+        Returns:
+            True wenn fortgefahren werden soll (Ziel entspricht dem Import oder
+            User bestätigt trotz Abweichung), sonst False.
+        """
+        import_path = self._get_first_history_path("import")
+        if import_path == destination:
+            return True
+        import_str = str(import_path) if import_path else "(kein Import-Eintrag)"
+        return curses.wrapper(
+            curses_confirm,
+            "Export-Ziel weicht vom letzten Import ab!\n"
+            f"Export: {destination}\n"
+            f"Import: {import_str}\n"
+            "Wirklich exportieren?",
+            default=False,
+        )
+
     def handle_export(self, destination: Path | None = None) -> None:
         """Export-Operation mit Auto-Detect: Single File oder Folder.
 
@@ -2075,6 +2082,9 @@ class LauncherApp:
             destination or self.export_path or self.select_path_with_history("export")
         )
         if destination is None:
+            return
+
+        if not self._confirm_export_target(destination):
             return
 
         # Single File: Dateiendung vorhanden ODER Ziel ist bereits eine Datei

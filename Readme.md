@@ -5,7 +5,7 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 ## Features
 
 - **Session-Management** – Neue Session im Workspace starten
-- **Export / Import** – Workspace als Backup sichern und wiederherstellen (Folder-Modus via `rsync`: Löschungen im Workspace werden ins Exportziel übertragen)
+- **Export / Import** – Workspace als Backup sichern und wiederherstellen (Folder-Modus via `rsync`: Löschungen im Workspace werden ins Exportziel übertragen); jeder Export warnt, wenn das Ziel vom letzten Import-Pfad abweicht
 - **Single-File-Modus** – Einzelne Dateien exportieren oder importieren
 - **History** – Zuletzt verwendete Pfade werden gespeichert und vorgeschlagen
 - **VS-Code-Sprung** – Importquelle (letzter Import-Pfad) direkt in VS Code öffnen
@@ -125,7 +125,7 @@ export_ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
 | `Enter` / `Space`     | Auswählen                              |
 | `r`                   | Status aktualisieren                   |
 | `s`                   | Shell direkt öffnen                    |
-| `e`                   | Export zum ersten Export-History-Eintrag (warnt, wenn der Pfad vom letzten Import abweicht) |
+| `e`                   | Export zum ersten Export-History-Eintrag (wie jeder Export: warnt, wenn der Pfad vom letzten Import abweicht) |
 | `i`                   | Import vom ersten Import-History-Eintrag (mit bestehender Lösch-Rückfrage) |
 | `v`                   | Importquelle in VS Code öffnen         |
 | `x`                   | `ask_for_reset` togglen                |

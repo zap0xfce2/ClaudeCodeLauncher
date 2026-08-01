@@ -40,6 +40,12 @@ KEY_BACKSPACE_DEL = 127
 KEY_SPACE = 32
 KEY_PRINTABLE_MAX = 126
 
+# XTerm Any-Event-Mouse-Tracking manuell schalten, da curses.mousemask() mit
+# REPORT_MOUSE_POSITION dies bei Apples mitgelieferter libncurses (5.4) nicht
+# zuverlässig ans Terminal übersetzt (keine Bewegungs-Events ohne Klick).
+XTERM_ENABLE_MOUSE_MOTION_TRACKING = "\x1b[?1003h"
+XTERM_DISABLE_MOUSE_MOTION_TRACKING = "\x1b[?1003l"
+
 # --- UI Layout ---
 MENU_TITLE_ROW = 1
 MENU_SEPARATOR_ROW = 2
@@ -241,6 +247,139 @@ def _render_menu_column(
             stdscr.addstr(y, x, f"  {label}")
 
 
+def _menu_column_hit_index(
+    column: list[tuple[int, str]],
+    x: int,
+    label_width: int,
+    mouse_y: int,
+    mouse_x: int,
+    height: int,
+) -> int | None:
+    """Prüft ob (mouse_y, mouse_x) einen Eintrag dieser Spalte trifft.
+
+    Spiegelt die Geometrie von _render_menu_column(): gleiche Y-Formel,
+    gleiche Sichtbarkeitsgrenze, X-Bereich = Präfix- + Label-Breite.
+
+    Args:
+        column: (original_index, label) Tuples dieser Spalte.
+        x: X-Startposition der Spalte (wie an _render_menu_column übergeben).
+        label_width: Breite des längsten Labels dieser Spalte.
+        mouse_y: Bildschirm-Y-Position des Mausereignisses.
+        mouse_x: Bildschirm-X-Position des Mausereignisses.
+        height: Terminalhöhe (für Sichtbarkeits-Check).
+
+    Returns:
+        original_index des getroffenen Eintrags, oder None.
+    """
+    row = mouse_y - MENU_START_ROW
+    if row < 0 or row >= len(column):
+        return None
+    if MENU_START_ROW + row >= height - 2:
+        return None
+    item_width = MENU_ITEM_PREFIX_WIDTH + label_width
+    if not (x <= mouse_x < x + item_width):
+        return None
+    return column[row][0]
+
+
+def _menu_item_at_position(
+    col1: list[tuple[int, str]],
+    col2: list[tuple[int, str]],
+    col1_x: int,
+    col2_x: int,
+    col1_label_width: int,
+    col2_label_width: int,
+    mouse_y: int,
+    mouse_x: int,
+    height: int,
+) -> int | None:
+    """Ermittelt den original_index des Menüeintrags unter dem Mauszeiger.
+
+    Args:
+        col1: Erste Menüspalte als (original_index, label) Tuples.
+        col2: Zweite Menüspalte als (original_index, label) Tuples.
+        col1_x: X-Startposition von Spalte 1.
+        col2_x: X-Startposition von Spalte 2.
+        col1_label_width: Breite des längsten Labels in Spalte 1.
+        col2_label_width: Breite des längsten Labels in Spalte 2.
+        mouse_y: Bildschirm-Y-Position des Mausereignisses.
+        mouse_x: Bildschirm-X-Position des Mausereignisses.
+        height: Terminalhöhe (für Sichtbarkeits-Check).
+
+    Returns:
+        original_index des getroffenen Eintrags, oder None falls kein Treffer.
+    """
+    hit = _menu_column_hit_index(col1, col1_x, col1_label_width, mouse_y, mouse_x, height)
+    if hit is not None:
+        return hit
+    return _menu_column_hit_index(col2, col2_x, col2_label_width, mouse_y, mouse_x, height)
+
+
+def _select_item_at_position(
+    items: list[tuple[str, str]], mouse_y: int, mouse_x: int, height: int
+) -> int | None:
+    """Ermittelt den Listenindex unter dem Mauszeiger in curses_select().
+
+    Spiegelt die Render-Geometrie: y = MENU_START_ROW + i, Sichtbarkeitsgrenze
+    height - 3, keine Scroll-Offset (im Gegensatz zu curses_browse()).
+
+    Args:
+        items: Liste von (value, label) Tuples.
+        mouse_y: Bildschirm-Y-Position des Mausereignisses.
+        mouse_x: Bildschirm-X-Position des Mausereignisses.
+        height: Terminalhöhe (für Sichtbarkeits-Check).
+
+    Returns:
+        Index des getroffenen Eintrags, oder None.
+    """
+    i = mouse_y - MENU_START_ROW
+    if i < 0 or i >= len(items):
+        return None
+    if MENU_START_ROW + i >= height - 3:
+        return None
+    _, label = items[i]
+    item_width = MENU_ITEM_PREFIX_WIDTH + len(label)
+    if not (ITEM_INDENT_X <= mouse_x < ITEM_INDENT_X + item_width):
+        return None
+    return i
+
+
+def _browse_item_at_position(
+    items: list[tuple[str, str]],
+    scroll_offset: int,
+    viewport_height: int,
+    list_start_y: int,
+    mouse_y: int,
+    mouse_x: int,
+    height: int,
+) -> int | None:
+    """Ermittelt den Listenindex unter dem Mauszeiger in curses_browse().
+
+    Berücksichtigt scroll_offset, da hier (anders als curses_select()) gescrollt wird.
+
+    Args:
+        items: Liste von (value, label) Tuples.
+        scroll_offset: Aktueller Scroll-Offset der Liste.
+        viewport_height: Anzahl sichtbarer Listenzeilen.
+        list_start_y: Bildschirm-Y-Position der ersten Listenzeile.
+        mouse_y: Bildschirm-Y-Position des Mausereignisses.
+        mouse_x: Bildschirm-X-Position des Mausereignisses.
+        height: Terminalhöhe (für Sichtbarkeits-Check).
+
+    Returns:
+        Index des getroffenen Eintrags, oder None.
+    """
+    row = mouse_y - list_start_y
+    if row < 0 or row >= viewport_height:
+        return None
+    idx = scroll_offset + row
+    if idx >= len(items) or list_start_y + row >= height - 2:
+        return None
+    if mouse_x < ITEM_INDENT_X:
+        return None
+    return idx
+
+
 def _load_login_shell_path() -> str | None:
     """Liest den PATH aus einer interaktiven Login-Shell des Users.
 
@@ -333,6 +472,7 @@ def curses_menu(
     idle_timeout_ms: int | None = None,
     idle_refresh_predicate: Callable[[], bool] | None = None,
     usage_stats_text: str | None = None,
+    mouse_enabled: bool = True,
 ) -> str | None:
     """Zeigt Hauptmenü mit Banner oben, Menü in zwei Spalten links und Status-Info rechts.
 
@@ -348,11 +488,18 @@ def curses_menu(
             wird ein echter Refresh ausgelöst. None = jeder Tick refresht sofort.
         usage_stats_text: Mehrzeiliger Text für die Claude-Nutzungsstatistik-Spalte
             ganz rechts (openusage-CLI), oder None wenn keine Daten verfügbar sind.
+        mouse_enabled: Ob Maus-Hover/Klick aktiviert werden soll (config.toml-Toggle).
 
     Returns:
         Action-Key des gewählten Eintrags, Sentinel-String oder None bei Abbruch.
     """
     _init_curses_colors(stdscr)
+    if mouse_enabled:
+        # REPORT_MOUSE_POSITION zusätzlich zu BUTTON1_CLICKED, sonst meldet curses nur
+        # Klicks, keine reine Bewegung (kein Hover-Highlight möglich).
+        curses.mousemask(curses.BUTTON1_CLICKED | curses.REPORT_MOUSE_POSITION)
+        sys.stdout.write(XTERM_ENABLE_MOUSE_MOTION_TRACKING)
+        sys.stdout.flush()
     current = default_index
 
     if idle_timeout_ms is not None:
@@ -362,129 +509,152 @@ def curses_menu(
         idle_refresh_predicate() if idle_refresh_predicate is not None else None
     )
 
-    while True:
-        stdscr.clear()
-        height, width = stdscr.getmaxyx()
+    try:
+        while True:
+            stdscr.clear()
+            height, width = stdscr.getmaxyx()
 
-        # Status-Text aufteilen: letzte Zeile = Footer, Rest = Info-Zeilen
-        status_lines = status_text.split("\n")
-        footer = status_lines[-1].strip() if status_lines else ""
-        info_lines = [line.strip() for line in status_lines[:-1]]
+            # Status-Text aufteilen: letzte Zeile = Footer, Rest = Info-Zeilen
+            status_lines = status_text.split("\n")
+            footer = status_lines[-1].strip() if status_lines else ""
+            info_lines = [line.strip() for line in status_lines[:-1]]
 
-        # Menü in zwei Spalten aufteilen (inhaltliche Gruppierung, siehe WORKFLOW_ACTIONS)
-        col1, col2 = _split_menu_columns(menu_items)
-        col1_label_width = max((len(label) for _, label in col1), default=0)
-        col2_label_width = max((len(label) for _, label in col2), default=0)
+            # Menü in zwei Spalten aufteilen (inhaltliche Gruppierung, siehe WORKFLOW_ACTIONS)
+            col1, col2 = _split_menu_columns(menu_items)
+            col1_label_width = max((len(label) for _, label in col1), default=0)
+            col2_label_width = max((len(label) for _, label in col2), default=0)
 
-        col1_x = UI_PADDING_X
-        col2_x = col1_x + col1_label_width + MENU_ITEM_PREFIX_WIDTH + MENU_COLUMN_GAP_X
+            col1_x = UI_PADDING_X
+            col2_x = col1_x + col1_label_width + MENU_ITEM_PREFIX_WIDTH + MENU_COLUMN_GAP_X
 
-        # Rechte Spalte dynamisch: an rechte Menüspalte anschließen + Puffer für Emoji + Abstand
-        status_anchor_x = col2_x if col2 else col1_x
-        status_anchor_width = col2_label_width if col2 else col1_label_width
-        right_col = (
-            status_anchor_x + status_anchor_width + MENU_ITEM_PREFIX_WIDTH + MENU_RIGHT_COL_BUFFER
-        )
-
-        # Claude-Nutzungsstatistik-Spalte ganz rechts, an Terminalbreite verankert
-        usage_col_x = width - USAGE_STATS_COL_WIDTH
-        show_usage_col = (
-            usage_stats_text is not None
-            and usage_col_x < width
-            and usage_col_x - right_col >= USAGE_STATS_MIN_GAP
-        )
-
-        # Titel links, Versionsnummer rechts
-        stdscr.addstr(
-            MENU_TITLE_ROW,
-            UI_PADDING_X,
-            banner_text,
-            curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD,
-        )
-        version_x = width - len(VERSION) - UI_PADDING_X
-        if version_x > len(banner_text) + 4:
-            stdscr.addstr(MENU_TITLE_ROW, version_x, VERSION)
-
-        # Separator
-        sep = "─" * (width - 4)
-        stdscr.addstr(
-            MENU_SEPARATOR_ROW, UI_PADDING_X, sep, curses.color_pair(COLOR_PAIR_ORANGE)
-        )
-
-        # Menü (zwei Spalten links)
-        _render_menu_column(stdscr, col1, current, col1_x, height)
-        if col2_x < width:
-            _render_menu_column(stdscr, col2, current, col2_x, height)
-
-        # Status-Info (rechts, neben den ersten Menü-Zeilen)
-        status_right_boundary = (
-            usage_col_x - MENU_COLUMN_GAP_X if show_usage_col else width - UI_PADDING_X
-        )
-        for i, line in enumerate(info_lines):
-            y = MENU_START_ROW + i
-            if y >= height - 2 or right_col >= width:
-                break
-            max_len = status_right_boundary - right_col
-            stdscr.addstr(
-                y, right_col, line[:max_len], curses.color_pair(COLOR_PAIR_GRAY)
+            # Rechte Spalte dynamisch: an rechte Menüspalte anschließen + Puffer für Emoji + Abstand
+            status_anchor_x = col2_x if col2 else col1_x
+            status_anchor_width = col2_label_width if col2 else col1_label_width
+            right_col = (
+                status_anchor_x + status_anchor_width + MENU_ITEM_PREFIX_WIDTH + MENU_RIGHT_COL_BUFFER
             )
 
-        # Claude-Nutzungsstatistik (rechts außen, openusage-CLI)
-        if show_usage_col:
-            for i, line in enumerate(usage_stats_text.split("\n")):
+            # Claude-Nutzungsstatistik-Spalte ganz rechts, an Terminalbreite verankert
+            usage_col_x = width - USAGE_STATS_COL_WIDTH
+            show_usage_col = (
+                usage_stats_text is not None
+                and usage_col_x < width
+                and usage_col_x - right_col >= USAGE_STATS_MIN_GAP
+            )
+
+            # Titel links, Versionsnummer rechts
+            stdscr.addstr(
+                MENU_TITLE_ROW,
+                UI_PADDING_X,
+                banner_text,
+                curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD,
+            )
+            version_x = width - len(VERSION) - UI_PADDING_X
+            if version_x > len(banner_text) + 4:
+                stdscr.addstr(MENU_TITLE_ROW, version_x, VERSION)
+
+            # Separator
+            sep = "─" * (width - 4)
+            stdscr.addstr(
+                MENU_SEPARATOR_ROW, UI_PADDING_X, sep, curses.color_pair(COLOR_PAIR_ORANGE)
+            )
+
+            # Menü (zwei Spalten links)
+            _render_menu_column(stdscr, col1, current, col1_x, height)
+            if col2_x < width:
+                _render_menu_column(stdscr, col2, current, col2_x, height)
+
+            # Status-Info (rechts, neben den ersten Menü-Zeilen)
+            status_right_boundary = (
+                usage_col_x - MENU_COLUMN_GAP_X if show_usage_col else width - UI_PADDING_X
+            )
+            for i, line in enumerate(info_lines):
                 y = MENU_START_ROW + i
-                if y >= height - 2:
+                if y >= height - 2 or right_col >= width:
                     break
-                max_len = width - usage_col_x - UI_PADDING_X
+                max_len = status_right_boundary - right_col
                 stdscr.addstr(
-                    y, usage_col_x, line.strip()[:max_len], curses.color_pair(COLOR_PAIR_GREEN)
+                    y, right_col, line[:max_len], curses.color_pair(COLOR_PAIR_GRAY)
                 )
 
-        # Footer (unterste Zeile, kein Rahmen)
-        if height > 3:
-            max_footer = width - 4
-            stdscr.addstr(
-                height - 2,
-                UI_PADDING_X,
-                footer[:max_footer],
-                curses.color_pair(COLOR_PAIR_GRAY),
-            )
+            # Claude-Nutzungsstatistik (rechts außen, openusage-CLI)
+            if show_usage_col:
+                for i, line in enumerate(usage_stats_text.split("\n")):
+                    y = MENU_START_ROW + i
+                    if y >= height - 2:
+                        break
+                    max_len = width - usage_col_x - UI_PADDING_X
+                    stdscr.addstr(
+                        y, usage_col_x, line.strip()[:max_len], curses.color_pair(COLOR_PAIR_GREEN)
+                    )
 
-        stdscr.refresh()
+            # Footer (unterste Zeile, kein Rahmen)
+            if height > 3:
+                max_footer = width - 4
+                stdscr.addstr(
+                    height - 2,
+                    UI_PADDING_X,
+                    footer[:max_footer],
+                    curses.color_pair(COLOR_PAIR_GRAY),
+                )
 
-        key = stdscr.getch()
+            stdscr.refresh()
 
-        if key == -1:
-            if (
-                idle_refresh_predicate is None
-                or idle_refresh_predicate() != initial_predicate_state
-            ):
+            key = stdscr.getch()
+
+            if key == -1:
+                if (
+                    idle_refresh_predicate is None
+                    or idle_refresh_predicate() != initial_predicate_state
+                ):
+                    return "__refresh__"
+                continue
+            elif _is_up_key(key):
+                current = (current - 1) % len(menu_items)
+            elif _is_down_key(key):
+                current = (current + 1) % len(menu_items)
+            elif _is_left_key(key) or _is_right_key(key):
+                current = _swap_menu_column(current, col1, col2)
+            elif key == curses.KEY_MOUSE:
+                try:
+                    _, mouse_x, mouse_y, _, bstate = curses.getmouse()
+                except curses.error:
+                    continue
+                hit = _menu_item_at_position(
+                    col1, col2, col1_x, col2_x, col1_label_width, col2_label_width,
+                    mouse_y, mouse_x, height,
+                )
+                if hit is None:
+                    continue
+                current = hit
+                if bstate & curses.BUTTON1_CLICKED:
+                    return menu_items[current][0]
+            elif key == ord("\n") or key == KEY_SPACE:
+                return menu_items[current][0]
+            elif key == ord("q"):
+                return None
+            elif key == ord("r"):
                 return "__refresh__"
-            continue
-        elif _is_up_key(key):
-            current = (current - 1) % len(menu_items)
-        elif _is_down_key(key):
-            current = (current + 1) % len(menu_items)
-        elif _is_left_key(key) or _is_right_key(key):
-            current = _swap_menu_column(current, col1, col2)
-        elif key == ord("\n") or key == KEY_SPACE:
-            return menu_items[current][0]
-        elif key == ord("q"):
-            return None
-        elif key == ord("r"):
-            return "__refresh__"
-        elif key == ord("x"):
-            return "__toggle_ask_reset__"
-        elif key == ord("o"):
-            return "__toggle_overwrite_ask__"
-        elif key == ord("s"):
-            return "shell"
-        elif key == ord("e"):
-            return "export_first"
-        elif key == ord("i"):
-            return "import_first"
-        elif key == ord("v"):
-            return "open_import_source"
+            elif key == ord("x"):
+                return "__toggle_ask_reset__"
+            elif key == ord("o"):
+                return "__toggle_overwrite_ask__"
+            elif key == ord("s"):
+                return "shell"
+            elif key == ord("e"):
+                return "export_first"
+            elif key == ord("i"):
+                return "import_first"
+            elif key == ord("v"):
+                return "open_import_source"
+    finally:
+        # Mausmodus muss vor endwin() (in curses.wrapper) explizit deaktiviert werden,
+        # sonst bleibt das Terminal in manchen Emulatoren im Mouse-Tracking-Modus
+        # (Escape-Sequenz-Müll in Shell / nachfolgenden curses_*-Dialogen).
+        if mouse_enabled:
+            sys.stdout.write(XTERM_DISABLE_MOUSE_MOTION_TRACKING)
+            sys.stdout.flush()
+            curses.mousemask(0)
 
 
 def curses_confirm(
@@ -629,6 +799,7 @@ def curses_select(
     items: list[tuple[str, str]],
     default_index: int,
     allow_edit: Literal[True],
+    mouse_enabled: bool = True,
 ) -> tuple[str | None, bool]: ...
 
 
@@ -639,6 +810,7 @@ def curses_select(
     items: list[tuple[str, str]],
     default_index: int = ...,
     allow_edit: Literal[False] = ...,
+    mouse_enabled: bool = True,
 ) -> str | None: ...
 
 
@@ -648,6 +820,7 @@ def curses_select(
     items: list[tuple[str, str]],
     default_index: int = 0,
     allow_edit: bool = False,
+    mouse_enabled: bool = True,
 ) -> tuple[str | None, bool] | str | None:
     """Auswahl-Dialog für Listen (z.B. History).
 
@@ -657,64 +830,88 @@ def curses_select(
         items: Liste von (value, label) Tuples.
         default_index: Vorausgewählter Index.
         allow_edit: Wenn True, gibt (value, edit_mode) zurück; Tab öffnet Editierdialog.
+        mouse_enabled: Ob Maus-Hover/Klick aktiviert werden soll (config.toml-Toggle).
 
     Returns:
         Wenn allow_edit=False: Gewählter value-String oder None.
         Wenn allow_edit=True: Tuple (value, edit_mode) oder (None, False).
     """
     _init_curses_colors(stdscr)
+    if mouse_enabled:
+        curses.mousemask(curses.BUTTON1_CLICKED | curses.REPORT_MOUSE_POSITION)
+        sys.stdout.write(XTERM_ENABLE_MOUSE_MOTION_TRACKING)
+        sys.stdout.flush()
     current = default_index
 
-    while True:
-        stdscr.clear()
-        height, width = stdscr.getmaxyx()
+    try:
+        while True:
+            stdscr.clear()
+            height, width = stdscr.getmaxyx()
 
-        stdscr.addstr(
-            2, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
-        )
+            stdscr.addstr(
+                2, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
+            )
 
-        # Items (Platz für Hint-Zeile am Ende lassen)
-        for i, (_, label) in enumerate(items):
-            y = MENU_START_ROW + i
-            if y >= height - 3:
-                break
-            if i == current:
-                stdscr.addstr(
-                    y,
-                    ITEM_INDENT_X,
-                    f"> {label}",
-                    curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
-                )
+            # Items (Platz für Hint-Zeile am Ende lassen)
+            for i, (_, label) in enumerate(items):
+                y = MENU_START_ROW + i
+                if y >= height - 3:
+                    break
+                if i == current:
+                    stdscr.addstr(
+                        y,
+                        ITEM_INDENT_X,
+                        f"> {label}",
+                        curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
+                    )
+                else:
+                    stdscr.addstr(y, ITEM_INDENT_X, f"  {label}")
+
+            # Hint-Zeile
+            if allow_edit:
+                hint = "[Enter] Auswählen  [Tab] Bearbeiten  [ESC] Abbrechen"
             else:
-                stdscr.addstr(y, ITEM_INDENT_X, f"  {label}")
+                hint = "[Enter] Auswählen  [ESC] Abbrechen"
+            stdscr.addstr(
+                height - 2, UI_PADDING_X, hint, curses.color_pair(COLOR_PAIR_GRAY)
+            )
 
-        # Hint-Zeile
-        if allow_edit:
-            hint = "[Enter] Auswählen  [Tab] Bearbeiten  [ESC] Abbrechen"
-        else:
-            hint = "[Enter] Auswählen  [ESC] Abbrechen"
-        stdscr.addstr(
-            height - 2, UI_PADDING_X, hint, curses.color_pair(COLOR_PAIR_GRAY)
-        )
+            stdscr.refresh()
 
-        stdscr.refresh()
+            key = stdscr.getch()
 
-        key = stdscr.getch()
-
-        if _is_up_key(key):
-            current = (current - 1) % len(items)
-        elif _is_down_key(key, include_tab=not allow_edit):
-            current = (current + 1) % len(items)
-        elif allow_edit and key == KEY_TAB:  # Tab im Edit-Modus → Editierdialog öffnen
-            return (items[current][0], True)
-        elif key == ord("\n"):
-            if allow_edit:
-                return (items[current][0], False)
-            return items[current][0]
-        elif key == KEY_ESC or key == ord("q"):
-            if allow_edit:
-                return (None, False)
-            return None
+            if _is_up_key(key):
+                current = (current - 1) % len(items)
+            elif _is_down_key(key, include_tab=not allow_edit):
+                current = (current + 1) % len(items)
+            elif key == curses.KEY_MOUSE:
+                try:
+                    _, mouse_x, mouse_y, _, bstate = curses.getmouse()
+                except curses.error:
+                    continue
+                hit = _select_item_at_position(items, mouse_y, mouse_x, height)
+                if hit is None:
+                    continue
+                current = hit
+                if bstate & curses.BUTTON1_CLICKED:
+                    if allow_edit:
+                        return (items[current][0], False)
+                    return items[current][0]
+            elif allow_edit and key == KEY_TAB:  # Tab im Edit-Modus → Editierdialog öffnen
+                return (items[current][0], True)
+            elif key == ord("\n"):
+                if allow_edit:
+                    return (items[current][0], False)
+                return items[current][0]
+            elif key == KEY_ESC or key == ord("q"):
+                if allow_edit:
+                    return (None, False)
+                return None
+    finally:
+        if mouse_enabled:
+            sys.stdout.write(XTERM_DISABLE_MOUSE_MOTION_TRACKING)
+            sys.stdout.flush()
+            curses.mousemask(0)
 
 
 def curses_browse(
@@ -722,6 +919,7 @@ def curses_browse(
     title: str,
     summary: str,
     items: list[tuple[str, str]],
+    mouse_enabled: bool = True,
 ) -> None:
     """Scrollbare Read-Only-Ansicht für Dateilisten.
 
@@ -730,92 +928,114 @@ def curses_browse(
         title: Überschrift der Ansicht.
         summary: Zusammenfassung (Dateianzahl, Gesamtgröße).
         items: Liste von (value, label) Tuples zum Anzeigen.
+        mouse_enabled: Ob Maus-Hover/Klick aktiviert werden soll (config.toml-Toggle).
     """
     _init_curses_colors(stdscr)
-    height, width = stdscr.getmaxyx()
+    if mouse_enabled:
+        curses.mousemask(curses.BUTTON1_CLICKED | curses.REPORT_MOUSE_POSITION)
+        sys.stdout.write(XTERM_ENABLE_MOUSE_MOTION_TRACKING)
+        sys.stdout.flush()
 
-    # Guard-Clause für zu kleine Terminals
-    if height < 8 or width < 40:
-        stdscr.addstr(0, 0, "Terminal zu klein!")
-        stdscr.getch()
-        return
-
-    current = 0
-
-    if not items:
-        stdscr.addstr(
-            2, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
-        )
-        stdscr.addstr(MENU_START_ROW, ITEM_INDENT_X, "Keine Dateien vorhanden.")
-        stdscr.addstr(
-            height - 2, UI_PADDING_X, "ESC Zurück", curses.color_pair(COLOR_PAIR_GRAY)
-        )
-        stdscr.refresh()
-        while True:
-            if stdscr.getch() == KEY_ESC:
-                return
-        return
-
-    while True:
-        stdscr.clear()
+    try:
         height, width = stdscr.getmaxyx()
-        # Verfügbare Zeilen: Header(3) + Summary(1) + Leerzeile(1) oben, Hint(2) unten
-        viewport_height = height - 7
 
-        stdscr.addstr(
-            1, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
-        )
-        stdscr.addstr(2, UI_PADDING_X, summary, curses.color_pair(COLOR_PAIR_GRAY))
-
-        # Scroll-Offset berechnen
-        scroll_offset = (
-            max(0, current - viewport_height + 1) if current >= viewport_height else 0
-        )
-
-        # Dateiliste rendern
-        list_start_y = 4
-        for i in range(viewport_height):
-            idx = scroll_offset + i
-            if idx >= len(items):
-                break
-            y = list_start_y + i
-            if y >= height - 2:
-                break
-            _, label = items[idx]
-            display = label[: width - 6]  # Auf Terminalbreite beschneiden
-            if idx == current:
-                stdscr.addstr(
-                    y,
-                    ITEM_INDENT_X,
-                    f"> {display}",
-                    curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
-                )
-            else:
-                stdscr.addstr(y, ITEM_INDENT_X, f"  {display}")
-
-        # Position-Indikator und Hint
-        pos_text = f"[{current + 1}/{len(items)}]"
-        hint = "↑↓/j/k Navigieren | ESC Zurück"
-        stdscr.addstr(
-            height - 2, UI_PADDING_X, hint, curses.color_pair(COLOR_PAIR_GRAY)
-        )
-        stdscr.addstr(
-            height - 2,
-            width - len(pos_text) - UI_PADDING_X,
-            pos_text,
-            curses.color_pair(COLOR_PAIR_GRAY),
-        )
-
-        stdscr.refresh()
-
-        key = stdscr.getch()
-
-        if _is_up_key(key):
-            current = (current - 1) % len(items)
-        elif _is_down_key(key):
-            current = (current + 1) % len(items)
-        elif key == KEY_ESC:
+        # Guard-Clause für zu kleine Terminals
+        if height < 8 or width < 40:
+            stdscr.addstr(0, 0, "Terminal zu klein!")
+            stdscr.getch()
             return
+
+        current = 0
+
+        if not items:
+            stdscr.addstr(
+                2, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
+            )
+            stdscr.addstr(MENU_START_ROW, ITEM_INDENT_X, "Keine Dateien vorhanden.")
+            stdscr.addstr(
+                height - 2, UI_PADDING_X, "ESC Zurück", curses.color_pair(COLOR_PAIR_GRAY)
+            )
+            stdscr.refresh()
+            while True:
+                if stdscr.getch() == KEY_ESC:
+                    return
+            return
+
+        while True:
+            stdscr.clear()
+            height, width = stdscr.getmaxyx()
+            # Verfügbare Zeilen: Header(3) + Summary(1) + Leerzeile(1) oben, Hint(2) unten
+            viewport_height = height - 7
+
+            stdscr.addstr(
+                1, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
+            )
+            stdscr.addstr(2, UI_PADDING_X, summary, curses.color_pair(COLOR_PAIR_GRAY))
+
+            # Scroll-Offset berechnen
+            scroll_offset = (
+                max(0, current - viewport_height + 1) if current >= viewport_height else 0
+            )
+
+            # Dateiliste rendern
+            list_start_y = 4
+            for i in range(viewport_height):
+                idx = scroll_offset + i
+                if idx >= len(items):
+                    break
+                y = list_start_y + i
+                if y >= height - 2:
+                    break
+                _, label = items[idx]
+                display = label[: width - 6]  # Auf Terminalbreite beschneiden
+                if idx == current:
+                    stdscr.addstr(
+                        y,
+                        ITEM_INDENT_X,
+                        f"> {display}",
+                        curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
+                    )
+                else:
+                    stdscr.addstr(y, ITEM_INDENT_X, f"  {display}")
+
+            # Position-Indikator und Hint
+            pos_text = f"[{current + 1}/{len(items)}]"
+            hint = "↑↓/j/k Navigieren | ESC Zurück"
+            stdscr.addstr(
+                height - 2, UI_PADDING_X, hint, curses.color_pair(COLOR_PAIR_GRAY)
+            )
+            stdscr.addstr(
+                height - 2,
+                width - len(pos_text) - UI_PADDING_X,
+                pos_text,
+                curses.color_pair(COLOR_PAIR_GRAY),
+            )
+
+            stdscr.refresh()
+
+            key = stdscr.getch()
+
+            if _is_up_key(key):
+                current = (current - 1) % len(items)
+            elif _is_down_key(key):
+                current = (current + 1) % len(items)
+            elif key == curses.KEY_MOUSE:
+                try:
+                    _, mouse_x, mouse_y, _, bstate = curses.getmouse()
+                except curses.error:
+                    continue
+                hit = _browse_item_at_position(
+                    items, scroll_offset, viewport_height, list_start_y, mouse_y, mouse_x, height
+                )
+                if hit is not None:
+                    current = hit
+            elif key == KEY_ESC:
+                return
+    finally:
+        if mouse_enabled:
+            sys.stdout.write(XTERM_DISABLE_MOUSE_MOTION_TRACKING)
+            sys.stdout.flush()
+            curses.mousemask(0)
 
 
 def curses_message(
@@ -977,6 +1197,7 @@ class ConfigManager:
             "dont_ask_on_export_overwrite": False,
             "plan_idle_timer_enabled": True,
             "plan_idle_timer_duration": DEFAULT_PLAN_IDLE_TIMER_DURATION,
+            "mouse_navigation_enabled": True,
         }
 
         if not self.config_path.exists():
@@ -1532,6 +1753,10 @@ class LauncherApp:
             return None
         return int(duration_seconds * MILLISECONDS_PER_SECOND)
 
+    def _is_mouse_navigation_enabled(self) -> bool:
+        """Ob Maus-Hover/Klick in curses_menu/curses_select/curses_browse aktiv ist."""
+        return self.config_manager.config.get("mouse_navigation_enabled", True)
+
     def get_menu_items(self) -> list[tuple[str, str]]:
         """Generiert Menü-Items basierend auf Workspace-Status.
 
@@ -1685,7 +1910,14 @@ class LauncherApp:
             history_items = self._build_history_items(history)
             history_items.append(("__custom__", "📝 Neuen Pfad eingeben"))
 
-            raw = curses.wrapper(curses_select, select_title, history_items, 0, True)
+            raw = curses.wrapper(
+                curses_select,
+                select_title,
+                history_items,
+                0,
+                True,
+                self._is_mouse_navigation_enabled(),
+            )
             selected, edit_mode = raw if raw is not None else (None, False)
 
             if selected is None:
@@ -1983,10 +2215,17 @@ class LauncherApp:
 
     def handle_browse(self) -> None:
         """Zeigt Workspace-Inhalt in scrollbarer Ansicht."""
+        self.config_manager.reload()
         contents = self.workspace_manager.get_contents()
         status = self.workspace_manager.get_status()
         summary = f"{status['file_count']} Dateien | {status['size_mb']} MB"
-        curses.wrapper(curses_browse, "📂 Workspace Inhalt", summary, contents)
+        curses.wrapper(
+            curses_browse,
+            "📂 Workspace Inhalt",
+            summary,
+            contents,
+            self._is_mouse_navigation_enabled(),
+        )
 
     def handle_plan(self) -> None:
         """Öffnet Plan.md im Workspace mit vi (wird erstellt falls nicht vorhanden)."""
@@ -2050,6 +2289,7 @@ class LauncherApp:
                 default_index = self._get_default_menu_index(menu_items)
                 idle_timeout_ms = self._get_plan_idle_timer_interval_ms()
                 usage_stats_text = self._build_usage_stats_text(_fetch_claude_usage_stats())
+                mouse_enabled = self._is_mouse_navigation_enabled()
 
                 try:
                     result = curses.wrapper(
@@ -2061,6 +2301,7 @@ class LauncherApp:
                         idle_timeout_ms,
                         self._plan_swap_file_exists,
                         usage_stats_text,
+                        mouse_enabled,
                     )
                 except KeyboardInterrupt:
                     print("\nAuf Wiedersehen!")

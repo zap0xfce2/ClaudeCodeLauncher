@@ -11,6 +11,7 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 - **VS-Code-Sprung** – Importquelle (letzter Import-Pfad) direkt in VS Code öffnen
 - **Ignore-Patterns** – Konfigurierbare Filter für Export und Import (z. B. `.git`, `.env`)
 - **Config-Hotkeys** – Optionen direkt im Hauptmenü togglen
+- **Maus-Navigation** – Hover wechselt die Auswahl, Klick bestätigt (Hauptmenü, Listen-Auswahl, Workspace-Inhalt anzeigen); per `config.toml` ab-/anschaltbar
 - **Shell-Zugang** – Terminal im Workspace-Verzeichnis öffnen
 - **Plan-Editor** – `Plan.md` direkt in `vi` öffnen oder erstellen
 - **macOS-Theme-Sync** – Claude-Theme wird automatisch mit Dark/Light Mode synchronisiert
@@ -100,6 +101,7 @@ Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann
 | `dont_ask_on_export_overwrite` | bool   | `false`  | Überschreib-Bestätigung beim Export unterdrücken                                        |
 | `plan_idle_timer_enabled`      | bool   | `true`   | Automatischer Menü-Refresh bei Änderung von `.Plan.md.swp` (nur Hauptmenü). Kein Hotkey, nur `config.toml` |
 | `plan_idle_timer_duration`     | int    | `10`     | Poll-Intervall in Sekunden für den Plan-Idle-Timer                                      |
+| `mouse_navigation_enabled`     | bool   | `true`   | Maus-Hover/Klick in Hauptmenü, Listen-Auswahl und Workspace-Inhalt anzeigen              |
 | `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern)              |
 
 `claude_instruction` wird manuell in `config.toml` gepflegt; eine Änderung wirkt nach Drücken von `r` (Refresh) im Hauptmenü, ohne den Launcher neu zu starten.
@@ -118,6 +120,8 @@ export_ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
 | --------------------- | -------------------------------------- |
 | `↑` / `↓` / `j` / `k` | Navigation                             |
 | `Tab` / `Shift+Tab`   | Navigation (vor/zurück)                |
+| Maus-Hover            | Auswahl wechselt zum Eintrag unter dem Zeiger (siehe `mouse_navigation_enabled`) |
+| Maus-Klick            | Eintrag auswählen (= Enter)            |
 | `Enter` / `Space`     | Auswählen                              |
 | `r`                   | Status aktualisieren                   |
 | `s`                   | Shell direkt öffnen                    |
@@ -145,6 +149,8 @@ export_ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
 | ----------------------------------- | -------------------------------------------------------------------- |
 | `↑` / `↓` / `j` / `k` / `Shift+Tab` | Navigation                                                           |
 | `Tab`                               | Navigation nach unten (Standard) / Edit-Dialog öffnen (Pfad-Auswahl) |
+| Maus-Hover                          | Auswahl wechselt zum Eintrag unter dem Zeiger                       |
+| Maus-Klick                          | Auswahl bestätigen (= Enter, öffnet nicht den Edit-Dialog)           |
 | `Enter`                             | Auswahl bestätigen (Pfad-Auswahl: direkt übernehmen ohne Edit)       |
 | `ESC` / `q`                         | Abbrechen                                                            |
 
@@ -156,4 +162,5 @@ Im Pfad-Auswahlmodus (`allow_edit`) öffnet `Tab` einen vorausgefüllten Edit-Di
 | ----------------------------------- | --------------------- |
 | `↑` / `↓` / `j` / `k` / `Shift+Tab` | Scrollen (nach oben)  |
 | `Tab`                               | Scrollen (nach unten) |
+| Maus-Hover / Maus-Klick             | Auswahl wechselt zum Eintrag unter dem Zeiger |
 | `ESC`                               | Zurück                |

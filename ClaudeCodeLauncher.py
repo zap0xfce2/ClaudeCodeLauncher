@@ -264,7 +264,12 @@ def _fetch_claude_usage_stats() -> dict[str, Any] | None:
         return None
     try:
         resources = json.loads(result.stdout)["providers"][OPENUSAGE_PROVIDER]["resources"]
-        return {"session": resources["session"], "weekly": resources["weekly"]}
+        session = resources["session"]
+        weekly = resources["weekly"]
+        return {
+            "session": {"used": session["used"], "resetsAt": session["resetsAt"]},
+            "weekly": {"used": weekly["used"], "resetsAt": weekly["resetsAt"]},
+        }
     except (json.JSONDecodeError, KeyError, TypeError):
         return None
 

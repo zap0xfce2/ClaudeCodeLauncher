@@ -380,6 +380,35 @@ def _browse_item_at_position(
     return idx
 
 
+def _confirm_choice_at_position(
+    choices: list[str], choice_x: int, y: int, mouse_y: int, mouse_x: int
+) -> int | None:
+    """Ermittelt den Choice-Index unter dem Mauszeiger in curses_confirm().
+
+    Horizontale Geometrie (zwei Choices in einer Zeile) statt vertikaler Liste –
+    kein Scroll-Offset/Sichtbarkeits-Check nötig, die Zeile ist immer vollständig sichtbar.
+
+    Args:
+        choices: Choice-Labels (["Ja", "Nein"]).
+        choice_x: X-Startposition der ersten Choice.
+        y: Y-Position der Choice-Zeile.
+        mouse_y: Bildschirm-Y-Position des Mausereignisses.
+        mouse_x: Bildschirm-X-Position des Mausereignisses.
+
+    Returns:
+        Index der getroffenen Choice (0=Ja, 1=Nein), oder None.
+    """
+    if mouse_y != y:
+        return None
+    x = choice_x
+    for i, choice in enumerate(choices):
+        item_width = MENU_ITEM_PREFIX_WIDTH + len(choice)
+        if x <= mouse_x < x + item_width:
+            return i
+        x += item_width + 2  # 2 = Trenner aus "  ".join() in curses_confirm()
+    return None
+
+
 def _load_login_shell_path() -> str | None:
     """Liest den PATH aus einer interaktiven Login-Shell des Users.
 
@@ -661,6 +690,7 @@ def curses_confirm(
     stdscr: "curses.window",
     message: str,
     default: bool = False,
+    mouse_enabled: bool = True,
 ) -> bool:
     """Zeigt Ja/Nein Dialog.
 
@@ -668,73 +698,95 @@ def curses_confirm(
         stdscr: Das Curses Hauptfenster.
         message: Anzuzeigende Frage (kann Zeilenumbrüche enthalten).
         default: True wenn Ja vorausgewählt sein soll.
+        mouse_enabled: Ob Maus-Hover/Klick aktiviert werden soll (config.toml-Toggle).
 
     Returns:
         True für Ja, False für Nein oder Abbruch.
     """
     _init_curses_colors(stdscr)
+    if mouse_enabled:
+        curses.mousemask(curses.BUTTON1_CLICKED | curses.REPORT_MOUSE_POSITION)
+        sys.stdout.write(XTERM_ENABLE_MOUSE_MOTION_TRACKING)
+        sys.stdout.flush()
     current = 0 if default else 1
     choices = ["Ja", "Nein"]
 
-    while True:
-        stdscr.clear()
-        height, width = stdscr.getmaxyx()
+    try:
+        while True:
+            stdscr.clear()
+            height, width = stdscr.getmaxyx()
 
-        # Message (mehrzeilig und zentriert)
-        lines = message.split("\n")
-        start_y = height // 2 - len(lines) - 2
+            # Message (mehrzeilig und zentriert)
+            lines = message.split("\n")
+            start_y = height // 2 - len(lines) - 2
 
-        for i, line in enumerate(lines):
-            x = max(0, (width - len(line)) // 2)
-            stdscr.addstr(
-                start_y + i,
-                x,
-                line,
-                curses.color_pair(COLOR_PAIR_GRAY) | curses.A_BOLD,
+            for i, line in enumerate(lines):
+                x = max(0, (width - len(line)) // 2)
+                stdscr.addstr(
+                    start_y + i,
+                    x,
+                    line,
+                    curses.color_pair(COLOR_PAIR_GRAY) | curses.A_BOLD,
+                )
+
+            # Choices
+            y = start_y + len(lines) + 2
+            choice_line = "  ".join(
+                [f"> {c}" if i == current else f"  {c}" for i, c in enumerate(choices)]
             )
+            stdscr.addstr(y, (width - len(choice_line)) // 2, choice_line)
 
-        # Choices
-        y = start_y + len(lines) + 2
-        choice_line = "  ".join(
-            [f"> {c}" if i == current else f"  {c}" for i, c in enumerate(choices)]
-        )
-        stdscr.addstr(y, (width - len(choice_line)) // 2, choice_line)
+            # Aktuelle Auswahl hervorheben
+            choice_x = (width - len(choice_line)) // 2
+            if current == 0:
+                stdscr.addstr(
+                    y,
+                    choice_x,
+                    f"> {choices[0]}",
+                    curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
+                )
+            else:
+                stdscr.addstr(
+                    y,
+                    choice_x + len(f"> {choices[0]}") + 2,
+                    f"> {choices[1]}",
+                    curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
+                )
 
-        # Aktuelle Auswahl hervorheben
-        choice_x = (width - len(choice_line)) // 2
-        if current == 0:
-            stdscr.addstr(
-                y,
-                choice_x,
-                f"> {choices[0]}",
-                curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
-            )
-        else:
-            stdscr.addstr(
-                y,
-                choice_x + len(f"> {choices[0]}") + 2,
-                f"> {choices[1]}",
-                curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
-            )
+            stdscr.refresh()
 
-        stdscr.refresh()
+            key = stdscr.getch()
 
-        key = stdscr.getch()
-
-        if key == curses.KEY_LEFT or key == ord("h"):
-            current = 0
-        elif key == curses.KEY_RIGHT or key == ord("l"):
-            current = 1
-        elif key == KEY_TAB:
-            current ^= 1  # Toggle zwischen Ja (0) und Nein (1)
-        elif key == ord("\n") or key == KEY_SPACE:
-            return current == 0
-        elif key == ord("y") or key == ord("j"):  # j=ja (Deutsch), y=yes (Englisch)
-            return True
-        elif key == ord("n"):
-            return False
-        elif key == KEY_ESC:
-            return False
+            if key == curses.KEY_LEFT or key == ord("h"):
+                current = 0
+            elif key == curses.KEY_RIGHT or key == ord("l"):
+                current = 1
+            elif key == KEY_TAB:
+                current ^= 1  # Toggle zwischen Ja (0) und Nein (1)
+            elif key == curses.KEY_MOUSE:
+                try:
+                    _, mouse_x, mouse_y, _, bstate = curses.getmouse()
+                except curses.error:
+                    continue
+                hit = _confirm_choice_at_position(choices, choice_x, y, mouse_y, mouse_x)
+                if hit is None:
+                    continue
+                current = hit
+                if bstate & curses.BUTTON1_CLICKED:
+                    return current == 0
+            elif key == ord("\n") or key == KEY_SPACE:
+                return current == 0
+            elif key == ord("y") or key == ord("j"):  # j=ja (Deutsch), y=yes (Englisch)
+                return True
+            elif key == ord("n"):
+                return False
+            elif key == KEY_ESC:
+                return False
+    finally:
+        if mouse_enabled:
+            sys.stdout.write(XTERM_DISABLE_MOUSE_MOTION_TRACKING)
+            sys.stdout.flush()
+            curses.mousemask(0)
 
 
 def curses_input(
@@ -1480,6 +1532,18 @@ class WorkspaceManager:
             None,
         )
 
+    def _is_mouse_navigation_enabled(self) -> bool:
+        """Liest mouse_navigation_enabled aus der Config (Default True, auch ohne ConfigManager).
+
+        Returns:
+            True wenn Maus-Hover/Klick in curses_confirm() aktiviert werden soll.
+        """
+        return (
+            self.config_manager.config.get("mouse_navigation_enabled", True)
+            if self.config_manager
+            else True
+        )
+
     def _confirm_overwrite(self, destination: Path) -> bool:
         """Fragt Bestätigung zum Überschreiben, sofern Config es nicht deaktiviert.
 
@@ -1500,6 +1564,7 @@ class WorkspaceManager:
             curses_confirm,
             f"Das Ziel ({destination}) existiert bereits.\nZiel wird synchronisiert – überzählige Dateien im Ziel werden gelöscht!\nFortfahren?",
             default=False,
+            mouse_enabled=self._is_mouse_navigation_enabled(),
         )
 
     def reset(self) -> bool:
@@ -1558,7 +1623,10 @@ class WorkspaceManager:
             )
             if ask_for_reset:
                 if curses.wrapper(
-                    curses_confirm, "Workspace jetzt zurücksetzen?", default=False
+                    curses_confirm,
+                    "Workspace jetzt zurücksetzen?",
+                    default=False,
+                    mouse_enabled=self._is_mouse_navigation_enabled(),
                 ):
                     return self.reset()
 
@@ -1683,6 +1751,7 @@ class WorkspaceManager:
                     curses_confirm,
                     "Alle Daten im Workspace werden beim Import gelöscht!\nFortfahren?",
                     default=False,
+                    mouse_enabled=self._is_mouse_navigation_enabled(),
                 )
                 if not confirm:
                     return False
@@ -2034,6 +2103,7 @@ class LauncherApp:
             curses_confirm,
             "Alle Daten im Workspace werden gelöscht!\nFortfahren?",
             default=False,
+            mouse_enabled=self._is_mouse_navigation_enabled(),
         )
         if confirm:
             if self.workspace_manager.reset():
@@ -2063,6 +2133,7 @@ class LauncherApp:
             f"Import: {import_str}\n"
             "Wirklich exportieren?",
             default=False,
+            mouse_enabled=self._is_mouse_navigation_enabled(),
         )
 
     def handle_export(self, destination: Path | None = None) -> None:
@@ -2129,6 +2200,7 @@ class LauncherApp:
                     curses_confirm,
                     f"Die Zieldatei ({destination}) existiert bereits.\nÜberschreiben?",
                     default=False,
+                    mouse_enabled=self._is_mouse_navigation_enabled(),
                 )
                 if not overwrite:
                     return

@@ -11,7 +11,7 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 - **VS-Code-Sprung** – Importquelle (letzter Import-Pfad) direkt in VS Code öffnen
 - **Ignore-Patterns** – Konfigurierbare Filter für Export und Import (z. B. `.git`, `.env`)
 - **Config-Hotkeys** – Optionen direkt im Hauptmenü togglen
-- **Maus-Navigation** – Hover wechselt die Auswahl, Klick bestätigt (Hauptmenü, Listen-Auswahl, Workspace-Inhalt anzeigen); per `config.toml` ab-/anschaltbar
+- **Maus-Navigation** – Hover wechselt die Auswahl, Klick bestätigt (Hauptmenü, Ja/Nein-Dialoge, Listen-Auswahl, Workspace-Inhalt anzeigen); per `config.toml` ab-/anschaltbar
 - **Shell-Zugang** – Terminal im Workspace-Verzeichnis öffnen
 - **Plan-Editor** – `Plan.md` direkt in `vi` öffnen oder erstellen
 - **macOS-Theme-Sync** – Claude-Theme wird automatisch mit Dark/Light Mode synchronisiert
@@ -101,7 +101,7 @@ Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann
 | `dont_ask_on_export_overwrite` | bool   | `false`  | Überschreib-Bestätigung beim Export unterdrücken                                        |
 | `plan_idle_timer_enabled`      | bool   | `true`   | Automatischer Menü-Refresh bei Änderung von `.Plan.md.swp` (nur Hauptmenü). Kein Hotkey, nur `config.toml` |
 | `plan_idle_timer_duration`     | int    | `10`     | Poll-Intervall in Sekunden für den Plan-Idle-Timer                                      |
-| `mouse_navigation_enabled`     | bool   | `true`   | Maus-Hover/Klick in Hauptmenü, Listen-Auswahl und Workspace-Inhalt anzeigen              |
+| `mouse_navigation_enabled`     | bool   | `true`   | Maus-Hover/Klick in Hauptmenü, Ja/Nein-Dialogen, Listen-Auswahl und Workspace-Inhalt anzeigen |
 | `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern)              |
 
 `claude_instruction` wird manuell in `config.toml` gepflegt; eine Änderung wirkt nach Drücken von `r` (Refresh) im Hauptmenü, ohne den Launcher neu zu starten.
@@ -138,6 +138,8 @@ export_ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
 | --------------------- | ------------------------- |
 | `←` / `→` / `h` / `l` | Zwischen Ja/Nein wechseln |
 | `Tab`                 | Zwischen Ja/Nein wechseln |
+| Maus-Hover            | Auswahl wechselt zu Ja/Nein unter dem Zeiger |
+| Maus-Klick            | Auswahl unter dem Zeiger sofort bestätigen |
 | `Enter` / `Space`     | Bestätigen                |
 | `y` / `j`             | Direkt Ja                 |
 | `n`                   | Direkt Nein               |

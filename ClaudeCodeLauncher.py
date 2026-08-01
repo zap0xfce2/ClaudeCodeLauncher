@@ -9,7 +9,7 @@ import os
 import shutil
 import sys
 import argparse
-import yaml
+import tomllib
 import curses
 import subprocess
 from pathlib import Path
@@ -827,17 +827,103 @@ def curses_message(
     stdscr.getch()
 
 
+def _toml_scalar(value: Any) -> str:
+    """Wandelt einen skalaren Config-Wert oder eine Liste von Strings in TOML-Literal-Syntax um.
+
+    Args:
+        value: str (inkl. leer), bool, int oder list[str].
+
+    Returns:
+        TOML-Literal-Darstellung des Werts.
+
+    Raises:
+        TypeError: Bei einem im Config-Schema nicht vorkommenden Typ.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        return json.dumps(value)
+    if isinstance(value, list):
+        if not value:
+            return "[]"
+        return "[" + ", ".join(_toml_scalar(item) for item in value) + "]"
+    raise TypeError(f"Nicht unterstützter Config-Typ für TOML: {type(value)}")
+
+
+def _toml_table_block(name: str, table: dict[str, str]) -> str:
+    """Baut einen [name]-Tabellenblock aus einem Dict[str, str] (z. B. claude_env).
+
+    Args:
+        name: Tabellenname.
+        table: Flaches Dict mit String-Werten.
+
+    Returns:
+        TOML-Tabellenblock inkl. Header.
+    """
+    lines = [f"[{name}]"]
+    lines.extend(f"{key} = {_toml_scalar(value)}" for key, value in table.items())
+    return "\n".join(lines)
+
+
+def _toml_array_of_tables_block(name: str, entries: list[dict[str, Any]]) -> str:
+    """Baut wiederholte [[name]]-Blöcke aus einer Liste flacher Dicts (z. B. history).
+
+    Args:
+        name: Tabellenname.
+        entries: Liste flacher Dicts; jeder Eintrag wird ein eigener Block.
+
+    Returns:
+        Aneinandergereihte TOML-Array-of-Tables-Blöcke.
+    """
+    blocks = []
+    for entry in entries:
+        lines = [f"[[{name}]]"]
+        lines.extend(f"{key} = {_toml_scalar(value)}" for key, value in entry.items())
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def _dump_toml(data: dict[str, Any]) -> str:
+    """Serialisiert das Config-Dict als lesbares TOML.
+
+    Deckt genau die im Config-Schema vorkommenden Typen ab: Skalare und Listen von
+    Strings werden als flache key = value Zeilen geschrieben (müssen vor jedem
+    Tabellenblock stehen), ein Dict[str, str] als [key]-Tabelle, eine nicht-leere
+    Liste von Dicts als [[key]] Array-of-Tables. Kein generischer TOML-Writer.
+
+    Args:
+        data: Config-Dictionary.
+
+    Returns:
+        Vollständiger TOML-Text inkl. abschließendem Zeilenumbruch.
+    """
+    scalar_lines = []
+    table_blocks = []
+    for key, value in data.items():
+        if isinstance(value, dict):
+            table_blocks.append(_toml_table_block(key, value))
+        elif isinstance(value, list) and value and isinstance(value[0], dict):
+            table_blocks.append(_toml_array_of_tables_block(key, value))
+        else:
+            scalar_lines.append(f"{key} = {_toml_scalar(value)}")
+
+    sections = ["\n".join(scalar_lines), *table_blocks]
+    return "\n\n".join(section for section in sections if section) + "\n"
+
+
 class ConfigManager:
-    """Verwaltet config.yaml mit Export/Import-History."""
+    """Verwaltet config.toml mit Export/Import-History."""
 
     def __init__(self, config_path: Path | None = None):
         """Initialisiert den ConfigManager.
 
         Args:
-            config_path: Pfad zur Config-Datei. Standardmäßig config.yaml im Script-Verzeichnis.
+            config_path: Pfad zur Config-Datei. Standardmäßig config.toml im Script-Verzeichnis.
         """
         if config_path is None:
-            config_path = Path(__file__).parent / "config.yaml"
+            config_path = Path(__file__).parent / "config.toml"
         self.config_path = Path(config_path)
         self.config = self.load_config()
 
@@ -848,7 +934,7 @@ class ConfigManager:
             Config-Dictionary mit allen Einstellungen.
 
         Raises:
-            yaml.YAMLError: Bei korrupter YAML-Datei (wird abgefangen, Backup erstellt).
+            tomllib.TOMLDecodeError: Bei korrupter TOML-Datei (wird abgefangen, Backup erstellt).
         """
         default_config = {
             "history": [],
@@ -868,16 +954,16 @@ class ConfigManager:
             return default_config
 
         try:
-            with open(self.config_path, "r") as f:
-                config = yaml.safe_load(f) or {}
+            with open(self.config_path, "rb") as f:
+                config = tomllib.load(f) or {}
                 for key, value in default_config.items():
                     if key not in config:
                         config[key] = value
                 return config
-        except yaml.YAMLError as e:
+        except tomllib.TOMLDecodeError as e:
             # Bei korrupter Config: Backup erstellen und Default verwenden
             print(f"Config-Datei korrupt: {e}")
-            backup_path = self.config_path.with_suffix(".yaml.bak")
+            backup_path = self.config_path.with_suffix(".toml.bak")
             if self.config_path.exists():
                 shutil.copy(self.config_path, backup_path)
             return default_config
@@ -887,7 +973,7 @@ class ConfigManager:
         self.config = self.load_config()
 
     def save_config(self, config: dict[str, Any] | None = None) -> None:
-        """Speichert Config in YAML.
+        """Speichert Config in TOML.
 
         Args:
             config: Zu speicherndes Dictionary. Wenn None, wird self.config verwendet.
@@ -897,9 +983,7 @@ class ConfigManager:
 
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.config_path, "w") as f:
-            yaml.dump(
-                config, f, default_flow_style=False, allow_unicode=True, sort_keys=False
-            )
+            f.write(_dump_toml(config))
 
     def add_to_history(self, path: Path, history_type: str) -> None:
         """Fügt Pfad zur History hinzu, limitiert auf max_history_entries.
@@ -1995,7 +2079,7 @@ Beispiele:
   %(prog)s /path/to/.claude                     # Verwendet angegebenes Workspace
   %(prog)s /path/to/.claude --export /backup    # Exportiert direkt zu angegebenem Pfad
   %(prog)s /path/to/.claude --import /backup    # Importiert direkt von angegebenem Pfad
-  %(prog)s /path/to/.claude --config custom.yaml # Verwendet eigene Config-Datei
+  %(prog)s /path/to/.claude --config custom.toml # Verwendet eigene Config-Datei
         """,
     )
     parser.add_argument("workspace", help="Pfad zum Workspace Verzeichnis (REQUIRED)")
@@ -2014,7 +2098,7 @@ Beispiele:
     parser.add_argument(
         "--config",
         default=None,
-        help="Pfad zur Config-Datei (default: ./config.yaml)",
+        help="Pfad zur Config-Datei (default: ./config.toml)",
     )
     parser.add_argument(
         "--claude-binary",

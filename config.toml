@@ -1,0 +1,23 @@
+max_history_entries = 10
+export_ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
+import_ignore_patterns = [".git", ".env", "build", "dist"]
+claude_instruction = ""
+ask_for_reset = true
+dont_ask_on_export_overwrite = false
+plan_idle_timer_enabled = true
+plan_idle_timer_duration = 10
+
+[[history]]
+path = "/your/path/ClaudeCodeLauncher"
+timestamp = "2026-02-08T21:08:38.175323"
+
+[[history]]
+path = "/your/path/Test2"
+timestamp = "2026-02-08T00:21:51.145375"
+
+[[history]]
+path = "/your/path/Test"
+timestamp = "2026-02-07T22:47:16.552642"
+
+[claude_env]
+ENABLE_TOOL_SEARCH = "true"

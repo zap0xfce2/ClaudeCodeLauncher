@@ -2,8 +2,8 @@
 name = "claude-code-launcher"
 version = "0.1.0"
 description = "Curses-basierter Terminal-Launcher für Claude Code Sessions"
-requires-python = ">=3.10"
-dependencies = ["pyyaml>=6.0.0"]
+requires-python = ">=3.11"
+dependencies = []
 
 [dependency-groups]
 dev = ["nuitka>=4.1"]

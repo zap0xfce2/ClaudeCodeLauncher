@@ -17,8 +17,7 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 
 ## Voraussetzungen
 
-- Python 3.10+
-- `pyyaml >= 6.0.0`
+- Python 3.11+
 - `rsync` (für Folder-Export/-Import; auf macOS vorinstalliert)
 - `code`-CLI von VS Code (optional, nur für „Importquelle in VS Code öffnen")
 - [Task](https://taskfile.dev) (nur für den Build)
@@ -52,10 +51,10 @@ Das ist der häufigste Verwendungsfall:
 python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace
 
 # Mit benutzerdefinierter Config-Datei
-python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --config /pfad/zur/config.yaml
+python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --config /pfad/zur/config.toml
 ```
 
-`config.yaml` wird standardmäßig im selben Verzeichnis wie `ClaudeCodeLauncher.py` angelegt. Das geöffnete Workspace-Verzeichnis wird im Hauptmenü oben rechts angezeigt.
+`config.toml` wird standardmäßig im selben Verzeichnis wie `ClaudeCodeLauncher.py` angelegt. Das geöffnete Workspace-Verzeichnis wird im Hauptmenü oben rechts angezeigt.
 
 ### Direkt-Modus (ohne Menü)
 
@@ -82,12 +81,12 @@ python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --claude-binary /usr/loc
 | `workspace`            | Pfad zum Arbeitsverzeichnis der Claude-Session (Workspace) **(Pflicht)** |
 | `--export PATH`        | Exportiert Workspace direkt zum angegebenen Pfad                         |
 | `--import PATH`        | Importiert Workspace direkt vom angegebenen Pfad                         |
-| `--config PATH`        | Pfad zur Config-Datei (Standard: `./config.yaml`)                        |
+| `--config PATH`        | Pfad zur Config-Datei (Standard: `./config.toml`)                        |
 | `--claude-binary PATH` | Pfad zum Claude Binary (Standard: automatische Erkennung via PATH)       |
 
 ## Konfiguration
 
-Die Datei `config.yaml` wird automatisch im Script-Verzeichnis erstellt und kann manuell bearbeitet werden.
+Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann manuell bearbeitet werden.
 
 | Option                         | Typ    | Standard | Beschreibung                                                                            |
 | ------------------------------ | ------ | -------- | --------------------------------------------------------------------------------------- |
@@ -99,21 +98,16 @@ Die Datei `config.yaml` wird automatisch im Script-Verzeichnis erstellt und kann
 | `claude_instruction`           | string | `""`     | Anweisung, die beim Start automatisch als erster Prompt an Claude übergeben wird (leer = keine) |
 | `ask_for_reset`                | bool   | `true`   | Nach Folder-Export: Fragen ob Workspace zurückgesetzt werden soll                       |
 | `dont_ask_on_export_overwrite` | bool   | `false`  | Überschreib-Bestätigung beim Export unterdrücken                                        |
-| `plan_idle_timer_enabled`      | bool   | `true`   | Automatischer Menü-Refresh bei Änderung von `.Plan.md.swp` (nur Hauptmenü). Kein Hotkey, nur `config.yaml` |
+| `plan_idle_timer_enabled`      | bool   | `true`   | Automatischer Menü-Refresh bei Änderung von `.Plan.md.swp` (nur Hauptmenü). Kein Hotkey, nur `config.toml` |
 | `plan_idle_timer_duration`     | int    | `10`     | Poll-Intervall in Sekunden für den Plan-Idle-Timer                                      |
 | `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern)              |
 
-`claude_instruction` wird manuell in `config.yaml` gepflegt; eine Änderung wirkt nach Drücken von `r` (Refresh) im Hauptmenü, ohne den Launcher neu zu starten.
+`claude_instruction` wird manuell in `config.toml` gepflegt; eine Änderung wirkt nach Drücken von `r` (Refresh) im Hauptmenü, ohne den Launcher neu zu starten.
 
 **Empfohlene Ignore-Patterns:**
 
-```yaml
-export_ignore_patterns:
-  - ".*"
-  - ".git"
-  - ".env"
-  - "*.pyc"
-  - "__pycache__"
+```toml
+export_ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
 ```
 
 ## Tastenkürzel

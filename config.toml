@@ -6,6 +6,7 @@ ask_for_reset = true
 dont_ask_on_export_overwrite = false
 plan_idle_timer_enabled = true
 plan_idle_timer_duration = 10
+mouse_navigation_enabled = true
 
 [[history]]
 path = "/your/path/ClaudeCodeLauncher"

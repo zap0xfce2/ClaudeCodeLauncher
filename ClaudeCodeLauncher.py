@@ -18,9 +18,20 @@ from typing import Any, Literal, overload
 from collections.abc import Callable
 
 # --- Curses Farb-Paar IDs ---
-COLOR_PAIR_CYAN = 1
-COLOR_PAIR_YELLOW = 2
+COLOR_PAIR_ORANGE = 1
+COLOR_PAIR_GRAY = 2
 COLOR_PAIR_GREEN = 3
+COLOR_PAIR_YELLOW = 4
+COLOR_PAIR_WHITE = 5
+
+# --- xterm256-Farben mit 8-Color-Fallback ---
+MIN_COLORS_FOR_XTERM256 = 256
+CLAUDE_ORANGE_XTERM256_COLOR = 166  # Titel/Branding (~#DA7756)
+CLAUDE_ORANGE_FALLBACK_COLOR = curses.COLOR_YELLOW
+MENU_HIGHLIGHT_XTERM256_COLOR = 226  # aktive Auswahl
+MENU_HIGHLIGHT_FALLBACK_COLOR = curses.COLOR_YELLOW
+HINT_GRAY_XTERM256_COLOR = 245  # Status/Hints
+HINT_GRAY_FALLBACK_COLOR = curses.COLOR_WHITE
 
 # --- Key Codes ---
 KEY_TAB = 9
@@ -76,6 +87,11 @@ MINUTES_PER_DAY = 1440
 ITEM_INDENT_X = UI_PADDING_X + 2  # = 4
 
 
+def _resolve_xterm256_color(xterm256_color: int, fallback_color: int) -> int:
+    """Wählt xterm256_color bei 256-Color-Terminal-Support, sonst fallback_color."""
+    return xterm256_color if curses.COLORS >= MIN_COLORS_FOR_XTERM256 else fallback_color
+
+
 def _init_curses_colors(stdscr: "curses.window") -> None:
     """Initialisiert alle Curses Farb-Paare und setzt Cursor einmalig.
 
@@ -84,9 +100,23 @@ def _init_curses_colors(stdscr: "curses.window") -> None:
     """
     curses.curs_set(0)
     curses.use_default_colors()
-    curses.init_pair(COLOR_PAIR_CYAN, curses.COLOR_CYAN, -1)
-    curses.init_pair(COLOR_PAIR_YELLOW, curses.COLOR_YELLOW, -1)
+    curses.init_pair(
+        COLOR_PAIR_ORANGE,
+        _resolve_xterm256_color(CLAUDE_ORANGE_XTERM256_COLOR, CLAUDE_ORANGE_FALLBACK_COLOR),
+        -1,
+    )
+    curses.init_pair(
+        COLOR_PAIR_GRAY,
+        _resolve_xterm256_color(HINT_GRAY_XTERM256_COLOR, HINT_GRAY_FALLBACK_COLOR),
+        -1,
+    )
     curses.init_pair(COLOR_PAIR_GREEN, curses.COLOR_GREEN, -1)
+    curses.init_pair(
+        COLOR_PAIR_YELLOW,
+        _resolve_xterm256_color(MENU_HIGHLIGHT_XTERM256_COLOR, MENU_HIGHLIGHT_FALLBACK_COLOR),
+        -1,
+    )
+    curses.init_pair(COLOR_PAIR_WHITE, curses.COLOR_WHITE, -1)
 
 
 def _is_up_key(key: int) -> bool:
@@ -205,7 +235,7 @@ def _render_menu_column(
             break
         if original_index == current:
             stdscr.addstr(
-                y, x, f"> {label}", curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD
+                y, x, f"> {label}", curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD
             )
         else:
             stdscr.addstr(y, x, f"  {label}")
@@ -369,7 +399,7 @@ def curses_menu(
             MENU_TITLE_ROW,
             UI_PADDING_X,
             banner_text,
-            curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD,
+            curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD,
         )
         version_x = width - len(VERSION) - UI_PADDING_X
         if version_x > len(banner_text) + 4:
@@ -378,7 +408,7 @@ def curses_menu(
         # Separator
         sep = "─" * (width - 4)
         stdscr.addstr(
-            MENU_SEPARATOR_ROW, UI_PADDING_X, sep, curses.color_pair(COLOR_PAIR_CYAN)
+            MENU_SEPARATOR_ROW, UI_PADDING_X, sep, curses.color_pair(COLOR_PAIR_ORANGE)
         )
 
         # Menü (zwei Spalten links)
@@ -396,7 +426,7 @@ def curses_menu(
                 break
             max_len = status_right_boundary - right_col
             stdscr.addstr(
-                y, right_col, line[:max_len], curses.color_pair(COLOR_PAIR_YELLOW)
+                y, right_col, line[:max_len], curses.color_pair(COLOR_PAIR_GRAY)
             )
 
         # Claude-Nutzungsstatistik (rechts außen, openusage-CLI)
@@ -417,7 +447,7 @@ def curses_menu(
                 height - 2,
                 UI_PADDING_X,
                 footer[:max_footer],
-                curses.color_pair(COLOR_PAIR_YELLOW),
+                curses.color_pair(COLOR_PAIR_GRAY),
             )
 
         stdscr.refresh()
@@ -490,7 +520,7 @@ def curses_confirm(
                 start_y + i,
                 x,
                 line,
-                curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
+                curses.color_pair(COLOR_PAIR_GRAY) | curses.A_BOLD,
             )
 
         # Choices
@@ -507,14 +537,14 @@ def curses_confirm(
                 y,
                 choice_x,
                 f"> {choices[0]}",
-                curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD,
+                curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
             )
         else:
             stdscr.addstr(
                 y,
                 choice_x + len(f"> {choices[0]}") + 2,
                 f"> {choices[1]}",
-                curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD,
+                curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
             )
 
         stdscr.refresh()
@@ -559,7 +589,7 @@ def curses_input(
 
     y = height // 2
     stdscr.addstr(
-        y - 2, UI_PADDING_X, prompt, curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD
+        y - 2, UI_PADDING_X, prompt, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
     )
     stdscr.addstr(y, UI_PADDING_X, "> ")
 
@@ -640,7 +670,7 @@ def curses_select(
         height, width = stdscr.getmaxyx()
 
         stdscr.addstr(
-            2, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD
+            2, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
         )
 
         # Items (Platz für Hint-Zeile am Ende lassen)
@@ -653,7 +683,7 @@ def curses_select(
                     y,
                     ITEM_INDENT_X,
                     f"> {label}",
-                    curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD,
+                    curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
                 )
             else:
                 stdscr.addstr(y, ITEM_INDENT_X, f"  {label}")
@@ -664,7 +694,7 @@ def curses_select(
         else:
             hint = "[Enter] Auswählen  [ESC] Abbrechen"
         stdscr.addstr(
-            height - 2, UI_PADDING_X, hint, curses.color_pair(COLOR_PAIR_YELLOW)
+            height - 2, UI_PADDING_X, hint, curses.color_pair(COLOR_PAIR_GRAY)
         )
 
         stdscr.refresh()
@@ -714,11 +744,11 @@ def curses_browse(
 
     if not items:
         stdscr.addstr(
-            2, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD
+            2, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
         )
         stdscr.addstr(MENU_START_ROW, ITEM_INDENT_X, "Keine Dateien vorhanden.")
         stdscr.addstr(
-            height - 2, UI_PADDING_X, "ESC Zurück", curses.color_pair(COLOR_PAIR_YELLOW)
+            height - 2, UI_PADDING_X, "ESC Zurück", curses.color_pair(COLOR_PAIR_GRAY)
         )
         stdscr.refresh()
         while True:
@@ -733,9 +763,9 @@ def curses_browse(
         viewport_height = height - 7
 
         stdscr.addstr(
-            1, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD
+            1, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
         )
-        stdscr.addstr(2, UI_PADDING_X, summary, curses.color_pair(COLOR_PAIR_YELLOW))
+        stdscr.addstr(2, UI_PADDING_X, summary, curses.color_pair(COLOR_PAIR_GRAY))
 
         # Scroll-Offset berechnen
         scroll_offset = (
@@ -758,7 +788,7 @@ def curses_browse(
                     y,
                     ITEM_INDENT_X,
                     f"> {display}",
-                    curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD,
+                    curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
                 )
             else:
                 stdscr.addstr(y, ITEM_INDENT_X, f"  {display}")
@@ -767,13 +797,13 @@ def curses_browse(
         pos_text = f"[{current + 1}/{len(items)}]"
         hint = "↑↓/j/k Navigieren | ESC Zurück"
         stdscr.addstr(
-            height - 2, UI_PADDING_X, hint, curses.color_pair(COLOR_PAIR_YELLOW)
+            height - 2, UI_PADDING_X, hint, curses.color_pair(COLOR_PAIR_GRAY)
         )
         stdscr.addstr(
             height - 2,
             width - len(pos_text) - UI_PADDING_X,
             pos_text,
-            curses.color_pair(COLOR_PAIR_YELLOW),
+            curses.color_pair(COLOR_PAIR_GRAY),
         )
 
         stdscr.refresh()
@@ -809,7 +839,7 @@ def curses_message(
         y,
         max(0, (width - len(title)) // 2),
         title,
-        curses.color_pair(COLOR_PAIR_CYAN) | curses.A_BOLD,
+        curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD,
     )
 
     lines = message.split("\n")
@@ -818,7 +848,7 @@ def curses_message(
             y + 2 + i,
             max(0, (width - len(line)) // 2),
             line,
-            curses.color_pair(COLOR_PAIR_YELLOW),
+            curses.color_pair(COLOR_PAIR_GRAY),
         )
 
     hint = "[ Beliebige Taste drücken ]"
@@ -1550,7 +1580,7 @@ class LauncherApp:
         overwrite_ask_str = "Nein" if dont_ask_overwrite else "Ja"
 
         footer = (
-            f"  [r] Refresh  [e] Export  [i] Import  [v] VS Code"
+            f"  [r] Refresh  [e] Quick Export  [i] Quick Import  [v] VS Code"
             f"  [x] Nach Export zurücksetzen: {ask_reset_str}"
             f"  [o] Überschreiben bestätigen: {overwrite_ask_str}  [q] Beenden"
         )

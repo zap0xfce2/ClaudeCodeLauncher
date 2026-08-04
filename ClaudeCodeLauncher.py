@@ -344,24 +344,101 @@ def _select_item_at_position(
     return i
 
 
-def _browse_item_at_position(
+def _compute_browse_column_layout(
+    items: list[tuple[str, str]], width: int
+) -> tuple[int, int, int]:
+    """Berechnet Spaltenzahl, Spaltenbreite und Zeilenzahl für die Grid-Darstellung in curses_browse().
+
+    Args:
+        items: Liste von (value, label) Tuples.
+        width: Terminalbreite.
+
+    Returns:
+        (num_columns, column_width, rows). column_width enthält Präfix
+        (MENU_ITEM_PREFIX_WIDTH) und Spaltenabstand (MENU_COLUMN_GAP_X); rows ist
+        die Zeilenzahl pro Spalte (aufgerundet). Bei sehr langen Labels ergibt
+        sich num_columns == 1 (entspricht der bisherigen Einzelspalten-Darstellung).
+    """
+    max_label_width = max((len(label) for _, label in items), default=0)
+    column_width = max_label_width + MENU_ITEM_PREFIX_WIDTH + MENU_COLUMN_GAP_X
+    available_width = width - UI_PADDING_X
+    num_columns = max(1, min(len(items), available_width // column_width))
+    rows = -(-len(items) // num_columns)  # ceil ohne math-Import
+    return num_columns, column_width, rows
+
+
+def _render_browse_columns(
+    stdscr: "curses.window",
     items: list[tuple[str, str]],
+    current: int,
     scroll_offset: int,
-    viewport_height: int,
+    num_columns: int,
+    column_width: int,
+    rows: int,
     list_start_y: int,
+    viewport_height: int,
+    height: int,
+) -> None:
+    """Rendert die Dateiliste in curses_browse() spaltenweise (column-major, wie `ls`).
+
+    Args:
+        stdscr: Das Curses Hauptfenster.
+        items: Liste von (value, label) Tuples.
+        current: Aktuell gewählter Index (für Highlight).
+        scroll_offset: Aktueller Scroll-Offset in Zeilen.
+        num_columns: Anzahl Spalten (aus _compute_browse_column_layout()).
+        column_width: Breite einer Spalte inkl. Präfix und Abstand.
+        rows: Zeilenzahl pro Spalte.
+        list_start_y: Bildschirm-Y-Position der ersten Listenzeile.
+        viewport_height: Anzahl sichtbarer Listenzeilen.
+        height: Terminalhöhe (für Sichtbarkeits-Check).
+    """
+    label_width = column_width - MENU_ITEM_PREFIX_WIDTH - MENU_COLUMN_GAP_X
+    for col in range(num_columns):
+        x = UI_PADDING_X + col * column_width
+        col_start = col * rows
+        col_end = min(col_start + rows, len(items))
+        for row in range(viewport_height):
+            idx = col_start + scroll_offset + row
+            if idx >= col_end:
+                break
+            y = list_start_y + row
+            if y >= height - 2:
+                break
+            _, label = items[idx]
+            display = label[:label_width]
+            if idx == current:
+                stdscr.addstr(
+                    y, x, f"> {display}", curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD
+                )
+            else:
+                stdscr.addstr(y, x, f"  {display}")
+
+
+def _browse_grid_item_at_position(
+    items: list[tuple[str, str]],
+    num_columns: int,
+    column_width: int,
+    rows: int,
+    scroll_offset: int,
+    list_start_y: int,
+    viewport_height: int,
     mouse_y: int,
     mouse_x: int,
     height: int,
 ) -> int | None:
-    """Ermittelt den Listenindex unter dem Mauszeiger in curses_browse().
+    """Ermittelt den Grid-Index unter dem Mauszeiger in curses_browse().
 
-    Berücksichtigt scroll_offset, da hier (anders als curses_select()) gescrollt wird.
+    Spiegelt die Geometrie von _render_browse_columns() (Spalten- und Zeilenzuordnung).
 
     Args:
         items: Liste von (value, label) Tuples.
-        scroll_offset: Aktueller Scroll-Offset der Liste.
-        viewport_height: Anzahl sichtbarer Listenzeilen.
+        num_columns: Anzahl Spalten (aus _compute_browse_column_layout()).
+        column_width: Breite einer Spalte inkl. Präfix und Abstand.
+        rows: Zeilenzahl pro Spalte.
+        scroll_offset: Aktueller Scroll-Offset in Zeilen.
         list_start_y: Bildschirm-Y-Position der ersten Listenzeile.
+        viewport_height: Anzahl sichtbarer Listenzeilen.
         mouse_y: Bildschirm-Y-Position des Mausereignisses.
         mouse_x: Bildschirm-X-Position des Mausereignisses.
         height: Terminalhöhe (für Sichtbarkeits-Check).
@@ -370,12 +447,16 @@ def _browse_item_at_position(
         Index des getroffenen Eintrags, oder None.
     """
     row = mouse_y - list_start_y
-    if row < 0 or row >= viewport_height:
+    if row < 0 or row >= viewport_height or list_start_y + row >= height - 2:
         return None
-    idx = scroll_offset + row
-    if idx >= len(items) or list_start_y + row >= height - 2:
+    if mouse_x < UI_PADDING_X:
         return None
-    if mouse_x < ITEM_INDENT_X:
+    col = (mouse_x - UI_PADDING_X) // column_width
+    if col >= num_columns:
+        return None
+    col_start = col * rows
+    idx = col_start + scroll_offset + row
+    if idx >= min(col_start + rows, len(items)):
         return None
     return idx
 
@@ -973,7 +1054,7 @@ def curses_browse(
     items: list[tuple[str, str]],
     mouse_enabled: bool = True,
 ) -> None:
-    """Scrollbare Read-Only-Ansicht für Dateilisten.
+    """Scrollbare Read-Only-Ansicht für Dateilisten, mehrspaltig (`ls`-artig) je nach Terminalbreite.
 
     Args:
         stdscr: Das Curses Hauptfenster.
@@ -1024,35 +1105,31 @@ def curses_browse(
             )
             stdscr.addstr(2, UI_PADDING_X, summary, curses.color_pair(COLOR_PAIR_GRAY))
 
-            # Scroll-Offset berechnen
+            # Spaltenlayout und Scroll-Offset berechnen (zeilenbasiert innerhalb der Spalte)
+            num_columns, column_width, rows = _compute_browse_column_layout(items, width)
+            current_row = current % rows
             scroll_offset = (
-                max(0, current - viewport_height + 1) if current >= viewport_height else 0
+                max(0, current_row - viewport_height + 1) if current_row >= viewport_height else 0
             )
 
-            # Dateiliste rendern
+            # Dateiliste spaltenweise rendern
             list_start_y = 4
-            for i in range(viewport_height):
-                idx = scroll_offset + i
-                if idx >= len(items):
-                    break
-                y = list_start_y + i
-                if y >= height - 2:
-                    break
-                _, label = items[idx]
-                display = label[: width - 6]  # Auf Terminalbreite beschneiden
-                if idx == current:
-                    stdscr.addstr(
-                        y,
-                        ITEM_INDENT_X,
-                        f"> {display}",
-                        curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
-                    )
-                else:
-                    stdscr.addstr(y, ITEM_INDENT_X, f"  {display}")
+            _render_browse_columns(
+                stdscr,
+                items,
+                current,
+                scroll_offset,
+                num_columns,
+                column_width,
+                rows,
+                list_start_y,
+                viewport_height,
+                height,
+            )
 
             # Position-Indikator und Hint
             pos_text = f"[{current + 1}/{len(items)}]"
-            hint = "↑↓/j/k Navigieren | ESC Zurück"
+            hint = "↑↓/j/k Navigieren  ←→/h/l Spalte wechseln | ESC Zurück"
             stdscr.addstr(
                 height - 2, UI_PADDING_X, hint, curses.color_pair(COLOR_PAIR_GRAY)
             )
@@ -1071,13 +1148,26 @@ def curses_browse(
                 current = (current - 1) % len(items)
             elif _is_down_key(key):
                 current = (current + 1) % len(items)
+            elif _is_left_key(key):
+                current = max(0, current - rows)
+            elif _is_right_key(key):
+                current = min(len(items) - 1, current + rows)
             elif key == curses.KEY_MOUSE:
                 try:
                     _, mouse_x, mouse_y, _, bstate = curses.getmouse()
                 except curses.error:
                     continue
-                hit = _browse_item_at_position(
-                    items, scroll_offset, viewport_height, list_start_y, mouse_y, mouse_x, height
+                hit = _browse_grid_item_at_position(
+                    items,
+                    num_columns,
+                    column_width,
+                    rows,
+                    scroll_offset,
+                    list_start_y,
+                    viewport_height,
+                    mouse_y,
+                    mouse_x,
+                    height,
                 )
                 if hit is not None:
                     current = hit
@@ -1420,38 +1510,62 @@ class WorkspaceManager:
             "size_mb": round(total_size / BYTES_PER_MB, 2),
         }
 
+    def _build_content_entry(self, path: Path) -> tuple[str, str, float]:
+        """Baut (relativer_pfad, Anzeigetext, mtime) für einen Datei- oder Punkt-Ordner-Eintrag.
+
+        Bei Verzeichnissen (Punkt-Ordner) wird die Größe rekursiv aus allen
+        enthaltenen Dateien summiert, statt den Ordnerinhalt einzeln aufzulisten.
+        """
+        rel_path = str(path.relative_to(self.workspace))
+        if path.is_dir():
+            size = sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
+        else:
+            size = path.stat().st_size
+
+        if size < BYTES_PER_KB:
+            size_str = f"{size} B"
+        elif size < BYTES_PER_MB:
+            size_str = f"{size / BYTES_PER_KB:.1f} KB"
+        else:
+            size_str = f"{size / BYTES_PER_MB:.1f} MB"
+
+        icon = "📁" if path.is_dir() else "📄"
+        label = f"{icon} {rel_path}  ({size_str})"
+
+        return rel_path, label, path.stat().st_mtime
+
     def get_contents(self) -> list[tuple[str, str]]:
         """Gibt Dateiliste zurück: [(relative_path, display_label), ...].
 
+        Punkt-Ordner (z. B. .git) werden als einzelner Eintrag mit rekursiv
+        berechneter Gesamtgröße geführt, ihr Inhalt wird nicht aufgelistet.
+        Punkt-Dateien (z. B. .env) erscheinen normal in der Liste.
+        Ordner-Einträge tragen ein 📁-Präfix, Datei-Einträge ein 📄-Präfix.
+
         Returns:
-            Sortierte Liste von (relativer_pfad, Anzeigetext) Tuples.
-            settings.local.json wird mit 🔒 markiert.
+            Nach letzter Änderung sortierte Liste (neueste zuerst) von
+            (relativer_pfad, Anzeigetext) Tuples.
         """
         if not self.workspace.exists():
             return []
 
         entries = []
-        for item in sorted(self.workspace.rglob("*")):
-            if not item.is_file():
-                continue
+        for root, dirnames, filenames in os.walk(self.workspace):
+            root_path = Path(root)
+            kept_dirnames = []
+            for dirname in dirnames:
+                if dirname.startswith("."):
+                    entries.append(self._build_content_entry(root_path / dirname))
+                else:
+                    kept_dirnames.append(dirname)
+            dirnames[:] = kept_dirnames
 
-            rel_path = str(item.relative_to(self.workspace))
-            size = item.stat().st_size
+            for filename in filenames:
+                entries.append(self._build_content_entry(root_path / filename))
 
-            if size < BYTES_PER_KB:
-                size_str = f"{size} B"
-            elif size < BYTES_PER_MB:
-                size_str = f"{size / BYTES_PER_KB:.1f} KB"
-            else:
-                size_str = f"{size / BYTES_PER_MB:.1f} MB"
-
-            label = f"{rel_path}  ({size_str})"
-            if item.name == "settings.local.json":
-                label = f"🔒 {label}"
-
-            entries.append((rel_path, label))
-
-        return entries
+        # Neueste zuerst, damit zuletzt bearbeitete Einträge in curses_browse() oben stehen.
+        entries.sort(key=lambda entry: entry[2], reverse=True)
+        return [(rel_path, label) for rel_path, label, _ in entries]
 
     @staticmethod
     def _delete_item(item: Path) -> None:

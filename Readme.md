@@ -12,6 +12,7 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 - **Ignore-Patterns** – Konfigurierbare Filter für Export und Import (z. B. `.git`, `.env`)
 - **Config-Hotkeys** – Optionen direkt im Hauptmenü togglen
 - **Maus-Navigation** – Hover wechselt die Auswahl, Klick bestätigt (Hauptmenü, Ja/Nein-Dialoge, Listen-Auswahl, Workspace-Inhalt anzeigen); per `config.toml` ab-/anschaltbar
+- **Workspace-Übersicht** – Mehrspaltige, nach letzter Änderung sortierte Dateiliste für schnelle Projekterkennung in breiten Terminal-Fenstern; Punkt-Ordner (z. B. `.git`) erscheinen als ein Eintrag mit rekursiv berechneter Gesamtgröße statt mit ihrem vollständigen Inhalt; 📁/📄-Symbole unterscheiden Ordner- und Datei-Einträge
 - **Shell-Zugang** – Terminal im Workspace-Verzeichnis öffnen
 - **Plan-Editor** – `Plan.md` direkt in `vi` öffnen oder erstellen
 - **macOS-Theme-Sync** – Claude-Theme wird automatisch mit Dark/Light Mode synchronisiert
@@ -49,25 +50,25 @@ Erstellt via Nuitka eine eigenständige Binary unter `/opt/homebrew/bin/ClaudeCo
 Das ist der häufigste Verwendungsfall:
 
 ```bash
-python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace
+./ClaudeCodeLauncher /pfad/zu/meinem-workspace
 
 # Mit benutzerdefinierter Config-Datei
-python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --config /pfad/zur/config.toml
+./ClaudeCodeLauncher /pfad/zu/meinem-workspace --config /pfad/zur/config.toml
 ```
 
-`config.toml` wird standardmäßig im selben Verzeichnis wie `ClaudeCodeLauncher.py` angelegt. Das geöffnete Workspace-Verzeichnis wird im Hauptmenü oben rechts angezeigt.
+`config.toml` wird standardmäßig im selben Verzeichnis wie `ClaudeCodeLauncher` angelegt. Das geöffnete Workspace-Verzeichnis wird im Hauptmenü oben rechts angezeigt.
 
 ### Direkt-Modus (ohne Menü)
 
 ```bash
 # Exportieren
-python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --export /pfad/zum/backup
+./ClaudeCodeLauncher /pfad/zu/meinem-workspace --export /pfad/zum/backup
 
 # Importieren
-python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --import /pfad/zum/backup
+./ClaudeCodeLauncher /pfad/zu/meinem-workspace --import /pfad/zum/backup
 
 # Mit benutzerdefiniertem Claude Binary
-python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --claude-binary /usr/local/bin/claude
+./ClaudeCodeLauncher /pfad/zu/meinem-workspace --claude-binary /usr/local/bin/claude
 ```
 
 **Single-File-Erkennung** erfolgt automatisch:
@@ -89,20 +90,20 @@ python3 ClaudeCodeLauncher.py /pfad/zu/meinem-workspace --claude-binary /usr/loc
 
 Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann manuell bearbeitet werden.
 
-| Option                         | Typ    | Standard | Beschreibung                                                                            |
-| ------------------------------ | ------ | -------- | --------------------------------------------------------------------------------------- |
-| `max_history_entries`          | int    | `10`     | Maximale Anzahl an History-Einträgen                                                    |
-| `history`                      | Liste  | `[]`     | Gespeicherte Export/Import-Pfade mit Timestamps                                         |
+| Option                         | Typ    | Standard | Beschreibung                                                                                                                        |
+| ------------------------------ | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `max_history_entries`          | int    | `10`     | Maximale Anzahl an History-Einträgen                                                                                                |
+| `history`                      | Liste  | `[]`     | Gespeicherte Export/Import-Pfade mit Timestamps                                                                                     |
 | `export_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Export übersprungen werden; passende Einträge im Exportziel (z. B. dessen `.git`/`.env`) bleiben unangetastet |
-| `import_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Import übersprungen werden                                        |
-| `claude_env`                   | Dict   | `{}`     | Umgebungsvariablen für Claude beim Start (z. B. `{ANTHROPIC_MODEL: "claude-opus-4-6"}`) |
-| `claude_instruction`           | string | `""`     | Anweisung, die beim Start automatisch als erster Prompt an Claude übergeben wird (leer = keine) |
-| `ask_for_reset`                | bool   | `true`   | Nach Folder-Export: Fragen ob Workspace zurückgesetzt werden soll                       |
-| `dont_ask_on_export_overwrite` | bool   | `false`  | Überschreib-Bestätigung beim Export unterdrücken                                        |
-| `plan_idle_timer_enabled`      | bool   | `true`   | Automatischer Menü-Refresh bei Änderung von `.Plan.md.swp` (nur Hauptmenü). Kein Hotkey, nur `config.toml` |
-| `plan_idle_timer_duration`     | int    | `10`     | Poll-Intervall in Sekunden für den Plan-Idle-Timer                                      |
-| `mouse_navigation_enabled`     | bool   | `true`   | Maus-Hover/Klick in Hauptmenü, Ja/Nein-Dialogen, Listen-Auswahl und Workspace-Inhalt anzeigen |
-| `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern)              |
+| `import_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Import übersprungen werden                                                                                    |
+| `claude_env`                   | Dict   | `{}`     | Umgebungsvariablen für Claude beim Start (z. B. `{ANTHROPIC_MODEL: "claude-opus-4-6"}`)                                             |
+| `claude_instruction`           | string | `""`     | Anweisung, die beim Start automatisch als erster Prompt an Claude übergeben wird (leer = keine)                                     |
+| `ask_for_reset`                | bool   | `true`   | Nach Folder-Export: Fragen ob Workspace zurückgesetzt werden soll                                                                   |
+| `dont_ask_on_export_overwrite` | bool   | `false`  | Überschreib-Bestätigung beim Export unterdrücken                                                                                    |
+| `plan_idle_timer_enabled`      | bool   | `true`   | Automatischer Menü-Refresh bei Änderung von `.Plan.md.swp` (nur Hauptmenü). Kein Hotkey, nur `config.toml`                          |
+| `plan_idle_timer_duration`     | int    | `10`     | Poll-Intervall in Sekunden für den Plan-Idle-Timer                                                                                  |
+| `mouse_navigation_enabled`     | bool   | `true`   | Maus-Hover/Klick in Hauptmenü, Ja/Nein-Dialogen, Listen-Auswahl und Workspace-Inhalt anzeigen                                       |
+| `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern)                                                          |
 
 `claude_instruction` wird manuell in `config.toml` gepflegt; eine Änderung wirkt nach Drücken von `r` (Refresh) im Hauptmenü, ohne den Launcher neu zu starten.
 
@@ -116,34 +117,34 @@ export_ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
 
 ### Hauptmenü
 
-| Taste                 | Aktion                                 |
-| --------------------- | -------------------------------------- |
-| `↑` / `↓` / `j` / `k` | Navigation                             |
-| `Tab` / `Shift+Tab`   | Navigation (vor/zurück)                |
-| Maus-Hover            | Auswahl wechselt zum Eintrag unter dem Zeiger (siehe `mouse_navigation_enabled`) |
-| Maus-Klick            | Eintrag auswählen (= Enter)            |
-| `Enter` / `Space`     | Auswählen                              |
-| `r`                   | Status aktualisieren                   |
-| `s`                   | Shell direkt öffnen                    |
+| Taste                 | Aktion                                                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `↑` / `↓` / `j` / `k` | Navigation                                                                                                    |
+| `Tab` / `Shift+Tab`   | Navigation (vor/zurück)                                                                                       |
+| Maus-Hover            | Auswahl wechselt zum Eintrag unter dem Zeiger (siehe `mouse_navigation_enabled`)                              |
+| Maus-Klick            | Eintrag auswählen (= Enter)                                                                                   |
+| `Enter` / `Space`     | Auswählen                                                                                                     |
+| `r`                   | Status aktualisieren                                                                                          |
+| `s`                   | Shell direkt öffnen                                                                                           |
 | `e`                   | Export zum ersten Export-History-Eintrag (wie jeder Export: warnt, wenn der Pfad vom letzten Import abweicht) |
-| `i`                   | Import vom ersten Import-History-Eintrag (mit bestehender Lösch-Rückfrage) |
-| `v`                   | Importquelle in VS Code öffnen         |
-| `x`                   | `ask_for_reset` togglen                |
-| `o`                   | `dont_ask_on_export_overwrite` togglen |
-| `q`                   | Beenden                                |
+| `i`                   | Import vom ersten Import-History-Eintrag (mit bestehender Lösch-Rückfrage)                                    |
+| `v`                   | Importquelle in VS Code öffnen                                                                                |
+| `x`                   | `ask_for_reset` togglen                                                                                       |
+| `o`                   | `dont_ask_on_export_overwrite` togglen                                                                        |
+| `q`                   | Beenden                                                                                                       |
 
 ### Ja/Nein-Dialoge
 
-| Taste                 | Aktion                    |
-| --------------------- | ------------------------- |
-| `←` / `→` / `h` / `l` | Zwischen Ja/Nein wechseln |
-| `Tab`                 | Zwischen Ja/Nein wechseln |
+| Taste                 | Aktion                                       |
+| --------------------- | -------------------------------------------- |
+| `←` / `→` / `h` / `l` | Zwischen Ja/Nein wechseln                    |
+| `Tab`                 | Zwischen Ja/Nein wechseln                    |
 | Maus-Hover            | Auswahl wechselt zu Ja/Nein unter dem Zeiger |
-| Maus-Klick            | Auswahl unter dem Zeiger sofort bestätigen |
-| `Enter` / `Space`     | Bestätigen                |
-| `y` / `j`             | Direkt Ja                 |
-| `n`                   | Direkt Nein               |
-| `ESC`                 | Abbrechen (= Nein)        |
+| Maus-Klick            | Auswahl unter dem Zeiger sofort bestätigen   |
+| `Enter` / `Space`     | Bestätigen                                   |
+| `y` / `j`             | Direkt Ja                                    |
+| `n`                   | Direkt Nein                                  |
+| `ESC`                 | Abbrechen (= Nein)                           |
 
 ### Listen-Auswahl
 
@@ -151,7 +152,7 @@ export_ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
 | ----------------------------------- | -------------------------------------------------------------------- |
 | `↑` / `↓` / `j` / `k` / `Shift+Tab` | Navigation                                                           |
 | `Tab`                               | Navigation nach unten (Standard) / Edit-Dialog öffnen (Pfad-Auswahl) |
-| Maus-Hover                          | Auswahl wechselt zum Eintrag unter dem Zeiger                       |
+| Maus-Hover                          | Auswahl wechselt zum Eintrag unter dem Zeiger                        |
 | Maus-Klick                          | Auswahl bestätigen (= Enter, öffnet nicht den Edit-Dialog)           |
 | `Enter`                             | Auswahl bestätigen (Pfad-Auswahl: direkt übernehmen ohne Edit)       |
 | `ESC` / `q`                         | Abbrechen                                                            |
@@ -160,9 +161,12 @@ Im Pfad-Auswahlmodus (`allow_edit`) öffnet `Tab` einen vorausgefüllten Edit-Di
 
 ### Inhalt anzeigen
 
-| Taste                               | Aktion                |
-| ----------------------------------- | --------------------- |
-| `↑` / `↓` / `j` / `k` / `Shift+Tab` | Scrollen (nach oben)  |
-| `Tab`                               | Scrollen (nach unten) |
+Mehrspaltige (`ls`-artige) Dateiliste, Spaltenzahl dynamisch nach Terminalbreite; sortiert nach letzter Änderung (neueste Dateien zuerst, oben links).
+
+| Taste                               | Aktion                                        |
+| ----------------------------------- | --------------------------------------------- |
+| `↑` / `↓` / `j` / `k` / `Shift+Tab` | Scrollen (nach oben)                          |
+| `Tab`                               | Scrollen (nach unten)                         |
+| `←` / `→` / `h` / `l`               | Spalte wechseln                               |
 | Maus-Hover / Maus-Klick             | Auswahl wechselt zum Eintrag unter dem Zeiger |
-| `ESC`                               | Zurück                |
+| `ESC`                               | Zurück                                        |

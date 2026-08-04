@@ -61,7 +61,7 @@ USAGE_STATS_MIN_GAP = MENU_COLUMN_GAP_X
 WORKFLOW_ACTIONS = frozenset({"plan", "start", "export", "import"})
 
 # --- Footer / Cheatsheet ---
-RECENT_SHORTCUTS_MAX_ENTRIES = 4
+RECENT_SHORTCUTS_MAX_ENTRIES = 6
 # Ein-Buchstaben-Hotkeys aus curses_menu() mit Anzeigetext, gemeinsame Quelle für
 # Footer (dynamischer Ausschnitt) und Cheatsheet ([h], vollständige Liste).
 SHORTCUT_LABELS: dict[str, str] = {

@@ -1331,14 +1331,19 @@ class ConfigManager:
             history_type: "export" oder "import".
 
         Returns:
-            Liste der History-Einträge.
+            Liste der History-Einträge dieses Typs (Alt-Einträge ohne type-Feld
+            zählen für beide Typen).
 
         Raises:
             ValueError: Wenn history_type ungültig ist.
         """
         if history_type not in ["export", "import"]:
             raise ValueError(f"Invalid history_type: {history_type}")
-        return self.config.get("history", [])
+        return [
+            h
+            for h in self.config.get("history", [])
+            if h.get("type", history_type) == history_type
+        ]
 
     def record_reset(self) -> None:
         """Speichert aktuellen Zeitstempel als letzten Reset-Zeitpunkt."""

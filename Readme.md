@@ -11,6 +11,8 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 - **VS-Code-Sprung** – Importquelle (letzter Import-Pfad) direkt in VS Code öffnen
 - **Ignore-Patterns** – Konfigurierbare Filter für Export und Import (z. B. `.git`, `.env`)
 - **Config-Hotkeys** – Optionen direkt im Hauptmenü togglen
+- **Shortcut-Cheatsheet** – Taste `h` zeigt eine Vollbild-Übersicht aller Shortcuts, schließt sich bei jedem beliebigen Tastendruck wieder
+- **Dynamischer Footer** – zeigt neben `[h]`/`[q]` die vier zuletzt verwendeten Shortcuts, sitzungsübergreifend in `config.toml` gemerkt
 - **Maus-Navigation** – Hover wechselt die Auswahl, Klick bestätigt (Hauptmenü, Ja/Nein-Dialoge, Listen-Auswahl, Workspace-Inhalt anzeigen); per `config.toml` ab-/anschaltbar
 - **Workspace-Übersicht** – Mehrspaltige, nach letzter Änderung sortierte Dateiliste für schnelle Projekterkennung in breiten Terminal-Fenstern; Punkt-Ordner (z. B. `.git`) erscheinen als ein Eintrag mit rekursiv berechneter Gesamtgröße statt mit ihrem vollständigen Inhalt; 📁/📄-Symbole unterscheiden Ordner- und Datei-Einträge
 - **Shell-Zugang** – Terminal im Workspace-Verzeichnis öffnen
@@ -103,6 +105,7 @@ Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann
 | `plan_idle_timer_enabled`      | bool   | `true`   | Automatischer Menü-Refresh bei Änderung von `.Plan.md.swp` (nur Hauptmenü). Kein Hotkey, nur `config.toml`                          |
 | `plan_idle_timer_duration`     | int    | `10`     | Poll-Intervall in Sekunden für den Plan-Idle-Timer                                                                                  |
 | `mouse_navigation_enabled`     | bool   | `true`   | Maus-Hover/Klick in Hauptmenü, Ja/Nein-Dialogen, Listen-Auswahl und Workspace-Inhalt anzeigen                                       |
+| `recent_shortcuts`             | Liste  | `[]`     | Zuletzt verwendete Hotkey-Buchstaben (neuestes zuerst, max. 4), bestimmt den dynamischen Footer-Ausschnitt. Automatisch gepflegt     |
 | `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern)                                                          |
 
 `claude_instruction` wird manuell in `config.toml` gepflegt; eine Änderung wirkt nach Drücken von `r` (Refresh) im Hauptmenü, ohne den Launcher neu zu starten.
@@ -117,45 +120,50 @@ export_ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
 
 ### Hauptmenü
 
-| Taste                 | Aktion                                                                                                        |
-| --------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `↑` / `↓` / `j` / `k` | Navigation                                                                                                    |
-| `Tab` / `Shift+Tab`   | Navigation (vor/zurück)                                                                                       |
-| Maus-Hover            | Auswahl wechselt zum Eintrag unter dem Zeiger (siehe `mouse_navigation_enabled`)                              |
-| Maus-Klick            | Eintrag auswählen (= Enter)                                                                                   |
-| `Enter` / `Space`     | Auswählen                                                                                                     |
-| `r`                   | Status aktualisieren                                                                                          |
-| `s`                   | Shell direkt öffnen                                                                                           |
-| `e`                   | Export zum ersten Export-History-Eintrag (wie jeder Export: warnt, wenn der Pfad vom letzten Import abweicht) |
-| `i`                   | Import vom ersten Import-History-Eintrag (mit bestehender Lösch-Rückfrage)                                    |
-| `v`                   | Importquelle in VS Code öffnen                                                                                |
-| `x`                   | `ask_for_reset` togglen                                                                                       |
-| `o`                   | `dont_ask_on_export_overwrite` togglen                                                                        |
-| `q`                   | Beenden                                                                                                       |
+| Taste               | Aktion                                                                                                        |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `↑` / `↓`           | Navigation                                                                                                    |
+| `Tab` / `Shift+Tab` | Navigation (vor/zurück)                                                                                       |
+| Maus-Hover          | Auswahl wechselt zum Eintrag unter dem Zeiger (siehe `mouse_navigation_enabled`)                              |
+| Maus-Klick          | Eintrag auswählen (= Enter)                                                                                   |
+| `Enter` / `Space`   | Auswählen                                                                                                     |
+| `h`                 | Shortcut-Cheatsheet anzeigen (alle Shortcuts, schließt bei beliebiger Taste)                                  |
+| `r`                 | Status aktualisieren                                                                                          |
+| `s`                 | Sitzung starten                                                                                               |
+| `t`                 | Shell direkt öffnen                                                                                           |
+| `p`                 | Plan schreiben (`Plan.md` in `vi` öffnen/erstellen)                                                           |
+| `e`                 | Export zum ersten Export-History-Eintrag (wie jeder Export: warnt, wenn der Pfad vom letzten Import abweicht) |
+| `i`                 | Import vom ersten Import-History-Eintrag (mit bestehender Lösch-Rückfrage)                                    |
+| `v`                 | Importquelle in VS Code öffnen                                                                                |
+| `x`                 | `ask_for_reset` togglen (nicht mehr im Footer, nur im Cheatsheet)                                             |
+| `o`                 | `dont_ask_on_export_overwrite` togglen (nicht mehr im Footer, nur im Cheatsheet)                              |
+| `q`                 | Beenden                                                                                                       |
+
+Der Footer zeigt neben `[h]`/`[q]` dynamisch die vier zuletzt verwendeten Shortcuts (siehe `recent_shortcuts`).
 
 ### Ja/Nein-Dialoge
 
-| Taste                 | Aktion                                       |
-| --------------------- | -------------------------------------------- |
-| `←` / `→` / `h` / `l` | Zwischen Ja/Nein wechseln                    |
-| `Tab`                 | Zwischen Ja/Nein wechseln                    |
-| Maus-Hover            | Auswahl wechselt zu Ja/Nein unter dem Zeiger |
-| Maus-Klick            | Auswahl unter dem Zeiger sofort bestätigen   |
-| `Enter` / `Space`     | Bestätigen                                   |
-| `y` / `j`             | Direkt Ja                                    |
-| `n`                   | Direkt Nein                                  |
-| `ESC`                 | Abbrechen (= Nein)                           |
+| Taste              | Aktion                                       |
+| ------------------ | --------------------------------------------- |
+| `←` / `→`          | Zwischen Ja/Nein wechseln                    |
+| `Tab`               | Zwischen Ja/Nein wechseln                    |
+| Maus-Hover          | Auswahl wechselt zu Ja/Nein unter dem Zeiger |
+| Maus-Klick          | Auswahl unter dem Zeiger sofort bestätigen   |
+| `Enter` / `Space`   | Bestätigen                                   |
+| `y` / `j`           | Direkt Ja                                    |
+| `n`                 | Direkt Nein                                  |
+| `ESC`               | Abbrechen (= Nein)                           |
 
 ### Listen-Auswahl
 
-| Taste                               | Aktion                                                               |
-| ----------------------------------- | -------------------------------------------------------------------- |
-| `↑` / `↓` / `j` / `k` / `Shift+Tab` | Navigation                                                           |
-| `Tab`                               | Navigation nach unten (Standard) / Edit-Dialog öffnen (Pfad-Auswahl) |
-| Maus-Hover                          | Auswahl wechselt zum Eintrag unter dem Zeiger                        |
-| Maus-Klick                          | Auswahl bestätigen (= Enter, öffnet nicht den Edit-Dialog)           |
-| `Enter`                             | Auswahl bestätigen (Pfad-Auswahl: direkt übernehmen ohne Edit)       |
-| `ESC` / `q`                         | Abbrechen                                                            |
+| Taste                     | Aktion                                                               |
+| ------------------------- | ---------------------------------------------------------------------- |
+| `↑` / `↓` / `Shift+Tab`   | Navigation                                                           |
+| `Tab`                     | Navigation nach unten (Standard) / Edit-Dialog öffnen (Pfad-Auswahl) |
+| Maus-Hover                | Auswahl wechselt zum Eintrag unter dem Zeiger                        |
+| Maus-Klick                | Auswahl bestätigen (= Enter, öffnet nicht den Edit-Dialog)           |
+| `Enter`                   | Auswahl bestätigen (Pfad-Auswahl: direkt übernehmen ohne Edit)       |
+| `ESC` / `q`               | Abbrechen                                                            |
 
 Im Pfad-Auswahlmodus (`allow_edit`) öffnet `Tab` einen vorausgefüllten Edit-Dialog; `Enter` übernimmt den Pfad direkt.
 
@@ -163,10 +171,10 @@ Im Pfad-Auswahlmodus (`allow_edit`) öffnet `Tab` einen vorausgefüllten Edit-Di
 
 Mehrspaltige (`ls`-artige) Dateiliste, Spaltenzahl dynamisch nach Terminalbreite; sortiert nach letzter Änderung (neueste Dateien zuerst, oben links).
 
-| Taste                               | Aktion                                        |
-| ----------------------------------- | --------------------------------------------- |
-| `↑` / `↓` / `j` / `k` / `Shift+Tab` | Scrollen (nach oben)                          |
-| `Tab`                               | Scrollen (nach unten)                         |
-| `←` / `→` / `h` / `l`               | Spalte wechseln                               |
-| Maus-Hover / Maus-Klick             | Auswahl wechselt zum Eintrag unter dem Zeiger |
+| Taste                     | Aktion                                        |
+| ------------------------- | ---------------------------------------------- |
+| `↑` / `↓` / `Shift+Tab`   | Scrollen (nach oben)                          |
+| `Tab`                     | Scrollen (nach unten)                         |
+| `←` / `→`                 | Spalte wechseln                               |
+| Maus-Hover / Maus-Klick   | Auswahl wechselt zum Eintrag unter dem Zeiger |
 | `ESC`                               | Zurück                                        |

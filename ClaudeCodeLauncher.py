@@ -60,6 +60,33 @@ USAGE_STATS_MIN_GAP = MENU_COLUMN_GAP_X
 # Spalten-Zuordnung für curses_menu(); muss mit Action-Keys aus LauncherApp.get_menu_items() übereinstimmen.
 WORKFLOW_ACTIONS = frozenset({"plan", "start", "export", "import"})
 
+# --- Footer / Cheatsheet ---
+RECENT_SHORTCUTS_MAX_ENTRIES = 4
+# Ein-Buchstaben-Hotkeys aus curses_menu() mit Anzeigetext, gemeinsame Quelle für
+# Footer (dynamischer Ausschnitt) und Cheatsheet ([h], vollständige Liste).
+SHORTCUT_LABELS: dict[str, str] = {
+    "r": "Refresh",
+    "s": "Sitzung starten",
+    "t": "Shell",
+    "e": "Quick Export",
+    "i": "Quick Import",
+    "v": "VS Code",
+    "p": "Plan schreiben",
+    "x": "Nach Export zurücksetzen",
+    "o": "Überschreiben bestätigen",
+    "h": "Hilfe",
+    "q": "Beenden",
+}
+# Menü-Actions (LauncherApp.handle_action()), deren Nutzung in recent_shortcuts getrackt wird.
+ACTION_TO_SHORTCUT: dict[str, str] = {
+    "start": "s",
+    "shell": "t",
+    "plan": "p",
+    "export_first": "e",
+    "import_first": "i",
+    "open_import_source": "v",
+}
+
 # --- Dateigrößen ---
 BYTES_PER_KB = 1024
 BYTES_PER_MB = 1024 * 1024
@@ -132,9 +159,9 @@ def _is_up_key(key: int) -> bool:
         key: Curses-Tastencode.
 
     Returns:
-        True für KEY_UP, k oder Shift+Tab.
+        True für KEY_UP oder Shift+Tab.
     """
-    return key in (curses.KEY_UP, ord("k"), curses.KEY_BTAB)
+    return key in (curses.KEY_UP, curses.KEY_BTAB)
 
 
 def _is_down_key(key: int, include_tab: bool = True) -> bool:
@@ -145,9 +172,9 @@ def _is_down_key(key: int, include_tab: bool = True) -> bool:
         include_tab: Ob Tab als Abwärts-Taste gilt (Standard: True).
 
     Returns:
-        True für KEY_DOWN, j oder (wenn include_tab) Tab.
+        True für KEY_DOWN oder (wenn include_tab) Tab.
     """
-    return key in (curses.KEY_DOWN, ord("j")) or (include_tab and key == KEY_TAB)
+    return key == curses.KEY_DOWN or (include_tab and key == KEY_TAB)
 
 
 def _is_left_key(key: int) -> bool:
@@ -157,9 +184,9 @@ def _is_left_key(key: int) -> bool:
         key: Curses-Tastencode.
 
     Returns:
-        True für KEY_LEFT oder h.
+        True für KEY_LEFT.
     """
-    return key in (curses.KEY_LEFT, ord("h"))
+    return key == curses.KEY_LEFT
 
 
 def _is_right_key(key: int) -> bool:
@@ -169,9 +196,9 @@ def _is_right_key(key: int) -> bool:
         key: Curses-Tastencode.
 
     Returns:
-        True für KEY_RIGHT oder l.
+        True für KEY_RIGHT.
     """
-    return key in (curses.KEY_RIGHT, ord("l"))
+    return key == curses.KEY_RIGHT
 
 
 def _split_menu_columns(
@@ -573,6 +600,55 @@ def _format_relative_reset(reset_iso: str) -> str:
     return f"{minutes}m"
 
 
+def _render_cheatsheet(stdscr: "curses.window", height: int, width: int) -> None:
+    """Zeigt eine Vollbild-Übersicht aller Shortcuts (zweispaltig, Klammern ausgerichtet).
+
+    Bleibt sichtbar bis der Aufrufer die nächste Taste abfängt (Press-and-dismiss).
+
+    Args:
+        stdscr: Das Curses Hauptfenster.
+        height: Terminalhöhe.
+        width: Terminalbreite.
+    """
+    stdscr.clear()
+    stdscr.addstr(
+        MENU_TITLE_ROW,
+        UI_PADDING_X,
+        "Shortcuts",
+        curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD,
+    )
+    sep = "─" * (width - 4)
+    stdscr.addstr(MENU_SEPARATOR_ROW, UI_PADDING_X, sep, curses.color_pair(COLOR_PAIR_ORANGE))
+
+    lines = [f"[{key}] {label}" for key, label in SHORTCUT_LABELS.items()]
+    split = -(-len(lines) // 2)  # ceil ohne math-Import
+    col1, col2 = lines[:split], lines[split:]
+    col1_width = max((len(line) for line in col1), default=0)
+    col1_x = UI_PADDING_X
+    col2_x = col1_x + col1_width + MENU_COLUMN_GAP_X
+
+    for row, line in enumerate(col1):
+        y = MENU_START_ROW + row
+        if y >= height - 2:
+            break
+        stdscr.addstr(y, col1_x, line)
+    if col2_x < width:
+        for row, line in enumerate(col2):
+            y = MENU_START_ROW + row
+            if y >= height - 2:
+                break
+            stdscr.addstr(y, col2_x, line)
+
+    if height > 3:
+        stdscr.addstr(
+            height - 2,
+            UI_PADDING_X,
+            "Beliebige Taste zum Schließen"[: width - 4],
+            curses.color_pair(COLOR_PAIR_GRAY),
+        )
+    stdscr.refresh()
+
+
 def curses_menu(
     stdscr: "curses.window",
     banner_text: str,
@@ -749,8 +825,20 @@ def curses_menu(
                 return "__toggle_ask_reset__"
             elif key == ord("o"):
                 return "__toggle_overwrite_ask__"
+            elif key == ord("h"):
+                if idle_timeout_ms is not None:
+                    stdscr.timeout(-1)
+                _render_cheatsheet(stdscr, height, width)
+                stdscr.getch()
+                if idle_timeout_ms is not None:
+                    stdscr.timeout(idle_timeout_ms)
+                continue
             elif key == ord("s"):
+                return "start"
+            elif key == ord("t"):
                 return "shell"
+            elif key == ord("p"):
+                return "plan"
             elif key == ord("e"):
                 return "export_first"
             elif key == ord("i"):
@@ -838,9 +926,9 @@ def curses_confirm(
 
             key = stdscr.getch()
 
-            if key == curses.KEY_LEFT or key == ord("h"):
+            if key == curses.KEY_LEFT:
                 current = 0
-            elif key == curses.KEY_RIGHT or key == ord("l"):
+            elif key == curses.KEY_RIGHT:
                 current = 1
             elif key == KEY_TAB:
                 current ^= 1  # Toggle zwischen Ja (0) und Nein (1)
@@ -1340,6 +1428,7 @@ class ConfigManager:
             "plan_idle_timer_enabled": True,
             "plan_idle_timer_duration": DEFAULT_PLAN_IDLE_TIMER_DURATION,
             "mouse_navigation_enabled": True,
+            "recent_shortcuts": [],
         }
 
         if not self.config_path.exists():
@@ -1454,6 +1543,18 @@ class ConfigManager:
         self.config[key] = not self.config.get(key, False)
         self.save_config()
         return self.config[key]
+
+    def record_shortcut_usage(self, shortcut: str) -> None:
+        """Merkt sich shortcut als zuletzt verwendet (neuestes zuerst, dedupliziert).
+
+        Args:
+            shortcut: Ein-Buchstaben-Hotkey der ausgeführten Aktion.
+        """
+        self.reload()
+        recent = [s for s in self.config.get("recent_shortcuts", []) if s != shortcut]
+        recent.insert(0, shortcut)
+        self.config["recent_shortcuts"] = recent[:RECENT_SHORTCUTS_MAX_ENTRIES]
+        self.save_config()
 
 
 class WorkspaceManager:
@@ -1983,20 +2084,14 @@ class LauncherApp:
             Mehrzeiliger String: Info-Zeilen + Footer als letzte Zeile.
         """
         workspace_path = str(self.workspace_manager.workspace)
-        ask_reset = self.config_manager.config.get("ask_for_reset", True)
-        dont_ask_overwrite = self.config_manager.config.get(
-            "dont_ask_on_export_overwrite", False
-        )
 
-        ask_reset_str = "Ja" if ask_reset else "Nein"
-        # dont_ask_on_export_overwrite=True bedeutet NICHT fragen → "Nein" anzeigen
-        overwrite_ask_str = "Nein" if dont_ask_overwrite else "Ja"
-
-        footer = (
-            f"  [r] Refresh  [e] Quick Export  [i] Quick Import  [v] VS Code"
-            f"  [x] Nach Export zurücksetzen: {ask_reset_str}"
-            f"  [o] Überschreiben bestätigen: {overwrite_ask_str}  [q] Beenden"
-        )
+        recent_shortcuts = self.config_manager.config.get("recent_shortcuts", [])
+        footer_segments = ["[h] Hilfe"]
+        footer_segments += [
+            f"[{key}] {SHORTCUT_LABELS[key]}" for key in recent_shortcuts if key in SHORTCUT_LABELS
+        ]
+        footer_segments.append("[q] Beenden")
+        footer = "  " + "  ".join(footer_segments)
 
         all_history = self.config_manager.config.get("history", [])
         last_export = next((h for h in all_history if h.get("type") == "export"), None)
@@ -2466,6 +2561,10 @@ class LauncherApp:
         Returns:
             Tuple (continue_loop, wait_for_enter).
         """
+        shortcut = ACTION_TO_SHORTCUT.get(action)
+        if shortcut is not None:
+            self.config_manager.record_shortcut_usage(shortcut)
+
         if action == "reset":
             self.handle_reset()
         elif action == "start":

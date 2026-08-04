@@ -2000,8 +2000,10 @@ class LauncherApp:
 
         all_history = self.config_manager.config.get("history", [])
         last_export = next((h for h in all_history if h.get("type") == "export"), None)
+        last_import = next((h for h in all_history if h.get("type") == "import"), None)
         last_reset_ts = self.config_manager.config.get("last_reset_timestamp")
         export_line = self._get_export_line(last_export, last_reset_ts)
+        import_line = self._get_import_line(last_import)
 
         content_line = (
             "   (leer)"
@@ -2009,7 +2011,7 @@ class LauncherApp:
             else f"   {status['file_count']} Dateien · {status['size_mb']} MB"
         )
 
-        return f"📁 {workspace_path}\n{content_line}\n{export_line}{footer}"
+        return f"📁 {workspace_path}\n{content_line}\n{export_line}{import_line}{footer}"
 
     @staticmethod
     def _get_export_line(last_export: dict | None, last_reset_ts: str | None) -> str:
@@ -2027,8 +2029,25 @@ class LauncherApp:
         export_ts = datetime.fromisoformat(last_export["timestamp"])
         reset_ts = datetime.fromisoformat(last_reset_ts) if last_reset_ts else None
         if reset_ts is None or export_ts > reset_ts:
-            return f"   Letzter Export: {export_ts.strftime('%d.%m.%Y %H:%M')}\n"
+            folder_name = Path(last_export["path"]).name
+            return f"   Letzter Export: {export_ts.strftime('%d.%m.%Y %H:%M')} ({folder_name})\n"
         return ""
+
+    @staticmethod
+    def _get_import_line(last_import: dict | None) -> str:
+        """Gibt Import-Info-Zeile zurück, wenn ein Import in der History existiert.
+
+        Args:
+            last_import: Letzter Import-Eintrag aus der History oder None.
+
+        Returns:
+            Formatierte Import-Zeile mit Newline oder leerer String.
+        """
+        if not last_import:
+            return ""
+        import_ts = datetime.fromisoformat(last_import["timestamp"])
+        folder_name = Path(last_import["path"]).name
+        return f"   Letzter Import: {import_ts.strftime('%d.%m.%Y %H:%M')} ({folder_name})\n"
 
     @staticmethod
     def _build_usage_stats_text(usage: dict[str, Any] | None) -> str | None:

@@ -793,7 +793,7 @@ def curses_menu(
                     idle_refresh_predicate is None
                     or idle_refresh_predicate() != initial_predicate_state
                 ):
-                    return "__refresh__"
+                    return "__idle_refresh__"
                 continue
             elif _is_up_key(key):
                 current = (current - 1) % len(menu_items)
@@ -2169,6 +2169,9 @@ class LauncherApp:
     def _handle_sentinel(self, result: str) -> bool:
         """Verarbeitet Sentinel-Rückgaben aus dem Menü (Refresh, Toggle-Hotkeys).
 
+        `"__refresh__"` (manueller Tastendruck `r`) trackt den Shortcut zusätzlich,
+        `"__idle_refresh__"` (automatischer Plan-Idle-Timer) bewusst nicht.
+
         Args:
             result: Rückgabewert von curses_menu.
 
@@ -2176,6 +2179,10 @@ class LauncherApp:
             True wenn ein Sentinel verarbeitet wurde (Loop soll fortgesetzt werden).
         """
         if result == "__refresh__":
+            self.config_manager.reload()
+            self.config_manager.record_shortcut_usage("r")
+            return True
+        if result == "__idle_refresh__":
             self.config_manager.reload()
             return True
         if result == "__toggle_ask_reset__":

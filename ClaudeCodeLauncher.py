@@ -1289,7 +1289,6 @@ def curses_browse(
             while True:
                 if stdscr.getch() == KEY_ESC:
                     return
-            return
 
         while True:
             stdscr.clear()
@@ -1333,7 +1332,7 @@ def curses_browse(
 
             # Position-Indikator und Hint
             pos_text = f"[{current + 1}/{len(items)}]"
-            hint = "↑↓/j/k Navigieren  ←→/h/l Spalte wechseln | ESC Zurück"
+            hint = "↑↓ Navigieren  ←→ Spalte wechseln | ESC Zurück"
             stdscr.addstr(
                 height - 2, UI_PADDING_X, hint, curses.color_pair(COLOR_PAIR_GRAY)
             )
@@ -1713,20 +1712,23 @@ class WorkspaceManager:
         Returns:
             Dict mit Schlüsseln: is_empty, file_count, size_mb.
         """
-        if self.is_empty():
+        relevant_files = (
+            [
+                item
+                for item in self.workspace.rglob("*")
+                if item.is_file() and item != self.settings_file
+            ]
+            if self.workspace.exists()
+            else []
+        )
+        if not relevant_files:
             return {"is_empty": True, "file_count": 0, "size_mb": 0.0}
 
-        relevant_files = [
-            item
-            for item in self.workspace.rglob("*")
-            if item.is_file() and item != self.settings_file
-        ]
-        file_count = len(relevant_files)
         total_size = sum(item.stat().st_size for item in relevant_files)
 
         return {
             "is_empty": False,
-            "file_count": file_count,
+            "file_count": len(relevant_files),
             "size_mb": round(total_size / BYTES_PER_MB, 2),
         }
 
@@ -2750,8 +2752,6 @@ class LauncherApp:
             self.handle_plan()
         elif action == "shell":
             self.handle_shell()
-        elif action == "quit":
-            return (False, False)
 
         return (True, False)
 

@@ -52,9 +52,11 @@ MENU_SEPARATOR_ROW = 2
 MENU_START_ROW = 4
 UI_PADDING_X = 2
 MENU_RIGHT_COL_BUFFER = 10
-MENU_COLUMN_GAP_X = 4          # Abstand zwischen Menüspalte 1 und Spalte 2
-MENU_ITEM_PREFIX_WIDTH = 2     # Breite von "> " bzw. "  " Präfix vor jedem Label
-USAGE_STATS_COL_WIDTH = 26     # Reservierte Breite für die Claude-Nutzungsstatistik-Spalte ganz rechts
+MENU_COLUMN_GAP_X = 4  # Abstand zwischen Menüspalte 1 und Spalte 2
+MENU_ITEM_PREFIX_WIDTH = 2  # Breite von "> " bzw. "  " Präfix vor jedem Label
+USAGE_STATS_COL_WIDTH = (
+    26  # Reservierte Breite für die Claude-Nutzungsstatistik-Spalte ganz rechts
+)
 USAGE_STATS_MIN_GAP = MENU_COLUMN_GAP_X
 
 # Spalten-Zuordnung für curses_menu(); muss mit Action-Keys aus LauncherApp.get_menu_items() übereinstimmen.
@@ -122,7 +124,9 @@ ITEM_INDENT_X = UI_PADDING_X + 2  # = 4
 
 def _resolve_xterm256_color(xterm256_color: int, fallback_color: int) -> int:
     """Wählt xterm256_color bei 256-Color-Terminal-Support, sonst fallback_color."""
-    return xterm256_color if curses.COLORS >= MIN_COLORS_FOR_XTERM256 else fallback_color
+    return (
+        xterm256_color if curses.COLORS >= MIN_COLORS_FOR_XTERM256 else fallback_color
+    )
 
 
 def _init_curses_colors(stdscr: "curses.window") -> None:
@@ -135,7 +139,9 @@ def _init_curses_colors(stdscr: "curses.window") -> None:
     curses.use_default_colors()
     curses.init_pair(
         COLOR_PAIR_ORANGE,
-        _resolve_xterm256_color(CLAUDE_ORANGE_XTERM256_COLOR, CLAUDE_ORANGE_FALLBACK_COLOR),
+        _resolve_xterm256_color(
+            CLAUDE_ORANGE_XTERM256_COLOR, CLAUDE_ORANGE_FALLBACK_COLOR
+        ),
         -1,
     )
     curses.init_pair(
@@ -146,7 +152,9 @@ def _init_curses_colors(stdscr: "curses.window") -> None:
     curses.init_pair(COLOR_PAIR_GREEN, curses.COLOR_GREEN, -1)
     curses.init_pair(
         COLOR_PAIR_YELLOW,
-        _resolve_xterm256_color(MENU_HIGHLIGHT_XTERM256_COLOR, MENU_HIGHLIGHT_FALLBACK_COLOR),
+        _resolve_xterm256_color(
+            MENU_HIGHLIGHT_XTERM256_COLOR, MENU_HIGHLIGHT_FALLBACK_COLOR
+        ),
         -1,
     )
     curses.init_pair(COLOR_PAIR_WHITE, curses.COLOR_WHITE, -1)
@@ -336,10 +344,14 @@ def _menu_item_at_position(
     Returns:
         original_index des getroffenen Eintrags, oder None falls kein Treffer.
     """
-    hit = _menu_column_hit_index(col1, col1_x, col1_label_width, mouse_y, mouse_x, height)
+    hit = _menu_column_hit_index(
+        col1, col1_x, col1_label_width, mouse_y, mouse_x, height
+    )
     if hit is not None:
         return hit
-    return _menu_column_hit_index(col2, col2_x, col2_label_width, mouse_y, mouse_x, height)
+    return _menu_column_hit_index(
+        col2, col2_x, col2_label_width, mouse_y, mouse_x, height
+    )
 
 
 def _select_item_at_position(
@@ -436,7 +448,10 @@ def _render_browse_columns(
             display = label[:label_width]
             if idx == current:
                 stdscr.addstr(
-                    y, x, f"> {display}", curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD
+                    y,
+                    x,
+                    f"> {display}",
+                    curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
                 )
             else:
                 stdscr.addstr(y, x, f"  {display}")
@@ -611,7 +626,10 @@ def _usage_stats_to_cache(usage: dict[str, Any]) -> dict[str, Any]:
 def _usage_stats_from_cache(cache: dict[str, Any]) -> dict[str, Any]:
     """Baut aus einem flachen usage_cache-Dict wieder die Form von _fetch_claude_usage_stats()."""
     return {
-        "session": {"used": cache["session_used"], "resetsAt": cache["session_resets_at"]},
+        "session": {
+            "used": cache["session_used"],
+            "resetsAt": cache["session_resets_at"],
+        },
         "weekly": {"used": cache["weekly_used"], "resetsAt": cache["weekly_resets_at"]},
         "generated_at": cache["generated_at"],
         "expires_at": cache["expires_at"],
@@ -628,7 +646,9 @@ def _format_relative_reset(reset_iso: str) -> str:
         Relative Restzeit bis zum Zeitstempel, "0m" falls bereits abgelaufen.
     """
     reset_dt = datetime.fromisoformat(reset_iso.replace("Z", "+00:00"))
-    total_minutes = max(int((reset_dt - datetime.now(timezone.utc)).total_seconds() // 60), 0)
+    total_minutes = max(
+        int((reset_dt - datetime.now(timezone.utc)).total_seconds() // 60), 0
+    )
     days, rem_minutes = divmod(total_minutes, MINUTES_PER_DAY)
     hours, minutes = divmod(rem_minutes, MINUTES_PER_HOUR)
     if days:
@@ -669,7 +689,9 @@ def _render_cheatsheet(stdscr: "curses.window", height: int, width: int) -> None
         curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD,
     )
     sep = "─" * (width - 4)
-    stdscr.addstr(MENU_SEPARATOR_ROW, UI_PADDING_X, sep, curses.color_pair(COLOR_PAIR_ORANGE))
+    stdscr.addstr(
+        MENU_SEPARATOR_ROW, UI_PADDING_X, sep, curses.color_pair(COLOR_PAIR_ORANGE)
+    )
 
     lines = [f"[{key}] {label}" for key, label in SHORTCUT_LABELS.items()]
     split = -(-len(lines) // 2)  # ceil ohne math-Import
@@ -762,13 +784,18 @@ def curses_menu(
             col2_label_width = max((len(label) for _, label in col2), default=0)
 
             col1_x = UI_PADDING_X
-            col2_x = col1_x + col1_label_width + MENU_ITEM_PREFIX_WIDTH + MENU_COLUMN_GAP_X
+            col2_x = (
+                col1_x + col1_label_width + MENU_ITEM_PREFIX_WIDTH + MENU_COLUMN_GAP_X
+            )
 
             # Rechte Spalte dynamisch: an rechte Menüspalte anschließen + Puffer für Emoji + Abstand
             status_anchor_x = col2_x if col2 else col1_x
             status_anchor_width = col2_label_width if col2 else col1_label_width
             right_col = (
-                status_anchor_x + status_anchor_width + MENU_ITEM_PREFIX_WIDTH + MENU_RIGHT_COL_BUFFER
+                status_anchor_x
+                + status_anchor_width
+                + MENU_ITEM_PREFIX_WIDTH
+                + MENU_RIGHT_COL_BUFFER
             )
 
             # Claude-Nutzungsstatistik-Spalte ganz rechts, an Terminalbreite verankert
@@ -793,7 +820,10 @@ def curses_menu(
             # Separator
             sep = "─" * (width - 4)
             stdscr.addstr(
-                MENU_SEPARATOR_ROW, UI_PADDING_X, sep, curses.color_pair(COLOR_PAIR_ORANGE)
+                MENU_SEPARATOR_ROW,
+                UI_PADDING_X,
+                sep,
+                curses.color_pair(COLOR_PAIR_ORANGE),
             )
 
             # Menü (zwei Spalten links)
@@ -803,7 +833,9 @@ def curses_menu(
 
             # Status-Info (rechts, neben den ersten Menü-Zeilen)
             status_right_boundary = (
-                usage_col_x - MENU_COLUMN_GAP_X if show_usage_col else width - UI_PADDING_X
+                usage_col_x - MENU_COLUMN_GAP_X
+                if show_usage_col
+                else width - UI_PADDING_X
             )
             for i, line in enumerate(info_lines):
                 y = MENU_START_ROW + i
@@ -815,14 +847,17 @@ def curses_menu(
                 )
 
             # Claude-Nutzungsstatistik (rechts außen, openusage-CLI)
-            if show_usage_col:
+            if show_usage_col and usage_stats_text is not None:
                 for i, line in enumerate(usage_stats_text.split("\n")):
                     y = MENU_START_ROW + i
                     if y >= height - 2:
                         break
                     max_len = width - usage_col_x - UI_PADDING_X
                     stdscr.addstr(
-                        y, usage_col_x, line.strip()[:max_len], curses.color_pair(COLOR_PAIR_GREEN)
+                        y,
+                        usage_col_x,
+                        line.strip()[:max_len],
+                        curses.color_pair(COLOR_PAIR_GREEN),
                     )
 
             # Footer (unterste Zeile, kein Rahmen)
@@ -858,8 +893,15 @@ def curses_menu(
                 except curses.error:
                     continue
                 hit = _menu_item_at_position(
-                    col1, col2, col1_x, col2_x, col1_label_width, col2_label_width,
-                    mouse_y, mouse_x, height,
+                    col1,
+                    col2,
+                    col1_x,
+                    col2_x,
+                    col1_label_width,
+                    col2_label_width,
+                    mouse_y,
+                    mouse_x,
+                    height,
                 )
                 if hit is None:
                     continue
@@ -988,7 +1030,9 @@ def curses_confirm(
                     _, mouse_x, mouse_y, _, bstate = curses.getmouse()
                 except curses.error:
                     continue
-                hit = _confirm_choice_at_position(choices, choice_x, y, mouse_y, mouse_x)
+                hit = _confirm_choice_at_position(
+                    choices, choice_x, y, mouse_y, mouse_x
+                )
                 if hit is None:
                     continue
                 current = hit
@@ -1031,7 +1075,10 @@ def curses_input(
 
     y = height // 2
     stdscr.addstr(
-        y - 2, UI_PADDING_X, prompt, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
+        y - 2,
+        UI_PADDING_X,
+        prompt,
+        curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD,
     )
     stdscr.addstr(y, UI_PADDING_X, "> ")
 
@@ -1121,7 +1168,10 @@ def curses_select(
             height, width = stdscr.getmaxyx()
 
             stdscr.addstr(
-                2, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
+                2,
+                UI_PADDING_X,
+                title,
+                curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD,
             )
 
             # Items (Platz für Hint-Zeile am Ende lassen)
@@ -1169,7 +1219,9 @@ def curses_select(
                     if allow_edit:
                         return (items[current][0], False)
                     return items[current][0]
-            elif allow_edit and key == KEY_TAB:  # Tab im Edit-Modus → Editierdialog öffnen
+            elif (
+                allow_edit and key == KEY_TAB
+            ):  # Tab im Edit-Modus → Editierdialog öffnen
                 return (items[current][0], True)
             elif key == ord("\n"):
                 if allow_edit:
@@ -1221,11 +1273,17 @@ def curses_browse(
 
         if not items:
             stdscr.addstr(
-                2, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
+                2,
+                UI_PADDING_X,
+                title,
+                curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD,
             )
             stdscr.addstr(MENU_START_ROW, ITEM_INDENT_X, "Keine Dateien vorhanden.")
             stdscr.addstr(
-                height - 2, UI_PADDING_X, "ESC Zurück", curses.color_pair(COLOR_PAIR_GRAY)
+                height - 2,
+                UI_PADDING_X,
+                "ESC Zurück",
+                curses.color_pair(COLOR_PAIR_GRAY),
             )
             stdscr.refresh()
             while True:
@@ -1240,15 +1298,22 @@ def curses_browse(
             viewport_height = height - 7
 
             stdscr.addstr(
-                1, UI_PADDING_X, title, curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD
+                1,
+                UI_PADDING_X,
+                title,
+                curses.color_pair(COLOR_PAIR_ORANGE) | curses.A_BOLD,
             )
             stdscr.addstr(2, UI_PADDING_X, summary, curses.color_pair(COLOR_PAIR_GRAY))
 
             # Spaltenlayout und Scroll-Offset berechnen (zeilenbasiert innerhalb der Spalte)
-            num_columns, column_width, rows = _compute_browse_column_layout(items, width)
+            num_columns, column_width, rows = _compute_browse_column_layout(
+                items, width
+            )
             current_row = current % rows
             scroll_offset = (
-                max(0, current_row - viewport_height + 1) if current_row >= viewport_height else 0
+                max(0, current_row - viewport_height + 1)
+                if current_row >= viewport_height
+                else 0
             )
 
             # Dateiliste spaltenweise rendern
@@ -1673,7 +1738,9 @@ class WorkspaceManager:
         """
         rel_path = str(path.relative_to(self.workspace))
         if path.is_dir():
-            size = sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
+            size = sum(
+                item.stat().st_size for item in path.rglob("*") if item.is_file()
+            )
         else:
             size = path.stat().st_size
 
@@ -2113,7 +2180,9 @@ class LauncherApp:
         has_cache = USAGE_CACHE_REQUIRED_KEYS.issubset(cache)
 
         if has_cache:
-            expires_at = datetime.fromisoformat(cache["expires_at"].replace("Z", "+00:00"))
+            expires_at = datetime.fromisoformat(
+                cache["expires_at"].replace("Z", "+00:00")
+            )
             if datetime.now(timezone.utc) < expires_at:
                 return _usage_stats_from_cache(cache)
 
@@ -2171,7 +2240,9 @@ class LauncherApp:
         recent_shortcuts = self.config_manager.config.get("recent_shortcuts", [])
         footer_segments = ["[h] Hilfe"]
         footer_segments += [
-            f"[{key}] {SHORTCUT_LABELS[key]}" for key in recent_shortcuts if key in SHORTCUT_LABELS
+            f"[{key}] {SHORTCUT_LABELS[key]}"
+            for key in recent_shortcuts
+            if key in SHORTCUT_LABELS
         ]
         footer_segments.append("[q] Beenden")
         footer = "  " + "  ".join(footer_segments)
@@ -2189,7 +2260,9 @@ class LauncherApp:
             else f"   {status['file_count']} Dateien · {status['size_mb']} MB"
         )
 
-        return f"📁 {workspace_path}\n{content_line}\n{export_line}{import_line}{footer}"
+        return (
+            f"📁 {workspace_path}\n{content_line}\n{export_line}{import_line}{footer}"
+        )
 
     @staticmethod
     def _get_export_line(last_export: dict | None, last_reset_ts: str | None) -> str:
@@ -2699,7 +2772,9 @@ class LauncherApp:
                 status_text = self._build_status_text(status)
                 default_index = self._get_default_menu_index(menu_items)
                 idle_timeout_ms = self._get_plan_idle_timer_interval_ms()
-                usage_stats_text = self._build_usage_stats_text(self._get_cached_usage_stats())
+                usage_stats_text = self._build_usage_stats_text(
+                    self._get_cached_usage_stats()
+                )
                 mouse_enabled = self._is_mouse_navigation_enabled()
 
                 try:

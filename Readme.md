@@ -2,6 +2,10 @@
 
 Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions. Vereinfacht das Backup, Wiederherstellen und Wechseln zwischen verschiedenen Workspace-Verzeichnissen.
 
+## Motivation
+
+Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und auch jenseits von Git Änderungen tracken. Mit diesem Tool wurde die Möglichkeit geschaffen, mein Projekt in einem weiteren separaten Ordner zu halten, ganz ohne dass Claude Code meine Git History kennt. Das Management sollte dabei sehr einfach sein.
+
 ## Features
 
 - **Session-Management** – Neue Session im Workspace starten
@@ -18,6 +22,7 @@ Curses-basierter Terminal-Launcher für das Management von Claude Code Sessions.
 - **Shell-Zugang** – Terminal im Workspace-Verzeichnis öffnen
 - **Plan-Editor** – `Plan.md` direkt in `vi` öffnen oder erstellen
 - **macOS-Theme-Sync** – Claude-Theme wird automatisch mit Dark/Light Mode synchronisiert
+- **Claude-Nutzungsstatistik** – Session-/Weekly-Auslastung samt "Aktualisiert"-Zeitstempel via `openusage`-CLI (falls installiert); wird in `config.toml` zwischengespeichert, sodass sie auch bei einer fehlgeschlagenen Neu-Abfrage sichtbar bleibt
 
 ## Voraussetzungen
 
@@ -92,21 +97,22 @@ Das ist der häufigste Verwendungsfall:
 
 Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann manuell bearbeitet werden.
 
-| Option                         | Typ    | Standard | Beschreibung                                                                                                                        |
-| ------------------------------ | ------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `max_history_entries`          | int    | `10`     | Maximale Anzahl an History-Einträgen                                                                                                |
-| `history`                      | Liste  | `[]`     | Gespeicherte Export/Import-Pfade mit Timestamps                                                                                     |
-| `export_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Export übersprungen werden; passende Einträge im Exportziel (z. B. dessen `.git`/`.env`) bleiben unangetastet |
-| `import_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Import übersprungen werden                                                                                    |
-| `claude_env`                   | Dict   | `{}`     | Umgebungsvariablen für Claude beim Start (z. B. `{ANTHROPIC_MODEL: "claude-opus-4-6"}`)                                             |
-| `claude_instruction`           | string | `""`     | Anweisung, die beim Start automatisch als erster Prompt an Claude übergeben wird (leer = keine)                                     |
-| `ask_for_reset`                | bool   | `true`   | Nach Folder-Export: Fragen ob Workspace zurückgesetzt werden soll                                                                   |
-| `dont_ask_on_export_overwrite` | bool   | `false`  | Überschreib-Bestätigung beim Export unterdrücken                                                                                    |
-| `plan_idle_timer_enabled`      | bool   | `true`   | Automatischer Menü-Refresh bei Änderung von `.Plan.md.swp` (nur Hauptmenü). Kein Hotkey, nur `config.toml`                          |
-| `plan_idle_timer_duration`     | int    | `10`     | Poll-Intervall in Sekunden für den Plan-Idle-Timer                                                                                  |
-| `mouse_navigation_enabled`     | bool   | `true`   | Maus-Hover/Klick in Hauptmenü, Ja/Nein-Dialogen, Listen-Auswahl und Workspace-Inhalt anzeigen                                       |
-| `recent_shortcuts`             | Liste  | `[]`     | Zuletzt verwendete Hotkey-Buchstaben (neuestes zuerst, max. 4), bestimmt den dynamischen Footer-Ausschnitt. Automatisch gepflegt     |
-| `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern)                                                          |
+| Option                         | Typ    | Standard | Beschreibung                                                                                                                            |
+| ------------------------------ | ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `max_history_entries`          | int    | `10`     | Maximale Anzahl an History-Einträgen                                                                                                    |
+| `history`                      | Liste  | `[]`     | Gespeicherte Export/Import-Pfade mit Timestamps                                                                                         |
+| `export_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Export übersprungen werden; passende Einträge im Exportziel (z. B. dessen `.git`/`.env`) bleiben unangetastet     |
+| `import_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Import übersprungen werden                                                                                        |
+| `claude_env`                   | Dict   | `{}`     | Umgebungsvariablen für Claude beim Start (z. B. `{ANTHROPIC_MODEL: "claude-opus-4-6"}`)                                                 |
+| `claude_instruction`           | string | `""`     | Anweisung, die beim Start automatisch als erster Prompt an Claude übergeben wird (leer = keine)                                         |
+| `ask_for_reset`                | bool   | `true`   | Nach Folder-Export: Fragen ob Workspace zurückgesetzt werden soll                                                                       |
+| `dont_ask_on_export_overwrite` | bool   | `false`  | Überschreib-Bestätigung beim Export unterdrücken                                                                                        |
+| `plan_idle_timer_enabled`      | bool   | `true`   | Automatischer Menü-Refresh bei Änderung von `.Plan.md.swp` (nur Hauptmenü). Kein Hotkey, nur `config.toml`                              |
+| `plan_idle_timer_duration`     | int    | `10`     | Poll-Intervall in Sekunden für den Plan-Idle-Timer                                                                                      |
+| `mouse_navigation_enabled`     | bool   | `true`   | Maus-Hover/Klick in Hauptmenü, Ja/Nein-Dialogen, Listen-Auswahl und Workspace-Inhalt anzeigen                                           |
+| `recent_shortcuts`             | Liste  | `[]`     | Zuletzt verwendete Hotkey-Buchstaben (neuestes zuerst, max. 4), bestimmt den dynamischen Footer-Ausschnitt. Automatisch gepflegt        |
+| `usage_cache`                  | Dict   | `{}`     | Zwischengespeicherte Claude-Nutzungsstatistik der letzten erfolgreichen `openusage`-Abfrage. Automatisch gepflegt, nicht manuell ändern |
+| `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern)                                                              |
 
 `claude_instruction` wird manuell in `config.toml` gepflegt; eine Änderung wirkt nach Drücken von `r` (Refresh) im Hauptmenü, ohne den Launcher neu zu starten.
 
@@ -143,27 +149,27 @@ Der Footer zeigt neben `[h]`/`[q]` dynamisch die vier zuletzt verwendeten Shortc
 
 ### Ja/Nein-Dialoge
 
-| Taste              | Aktion                                       |
-| ------------------ | --------------------------------------------- |
-| `←` / `→`          | Zwischen Ja/Nein wechseln                    |
-| `Tab`               | Zwischen Ja/Nein wechseln                    |
-| Maus-Hover          | Auswahl wechselt zu Ja/Nein unter dem Zeiger |
-| Maus-Klick          | Auswahl unter dem Zeiger sofort bestätigen   |
-| `Enter` / `Space`   | Bestätigen                                   |
-| `y` / `j`           | Direkt Ja                                    |
-| `n`                 | Direkt Nein                                  |
-| `ESC`               | Abbrechen (= Nein)                           |
+| Taste             | Aktion                                       |
+| ----------------- | -------------------------------------------- |
+| `←` / `→`         | Zwischen Ja/Nein wechseln                    |
+| `Tab`             | Zwischen Ja/Nein wechseln                    |
+| Maus-Hover        | Auswahl wechselt zu Ja/Nein unter dem Zeiger |
+| Maus-Klick        | Auswahl unter dem Zeiger sofort bestätigen   |
+| `Enter` / `Space` | Bestätigen                                   |
+| `y` / `j`         | Direkt Ja                                    |
+| `n`               | Direkt Nein                                  |
+| `ESC`             | Abbrechen (= Nein)                           |
 
 ### Listen-Auswahl
 
-| Taste                     | Aktion                                                               |
-| ------------------------- | ---------------------------------------------------------------------- |
-| `↑` / `↓` / `Shift+Tab`   | Navigation                                                           |
-| `Tab`                     | Navigation nach unten (Standard) / Edit-Dialog öffnen (Pfad-Auswahl) |
-| Maus-Hover                | Auswahl wechselt zum Eintrag unter dem Zeiger                        |
-| Maus-Klick                | Auswahl bestätigen (= Enter, öffnet nicht den Edit-Dialog)           |
-| `Enter`                   | Auswahl bestätigen (Pfad-Auswahl: direkt übernehmen ohne Edit)       |
-| `ESC` / `q`               | Abbrechen                                                            |
+| Taste                   | Aktion                                                               |
+| ----------------------- | -------------------------------------------------------------------- |
+| `↑` / `↓` / `Shift+Tab` | Navigation                                                           |
+| `Tab`                   | Navigation nach unten (Standard) / Edit-Dialog öffnen (Pfad-Auswahl) |
+| Maus-Hover              | Auswahl wechselt zum Eintrag unter dem Zeiger                        |
+| Maus-Klick              | Auswahl bestätigen (= Enter, öffnet nicht den Edit-Dialog)           |
+| `Enter`                 | Auswahl bestätigen (Pfad-Auswahl: direkt übernehmen ohne Edit)       |
+| `ESC` / `q`             | Abbrechen                                                            |
 
 Im Pfad-Auswahlmodus (`allow_edit`) öffnet `Tab` einen vorausgefüllten Edit-Dialog; `Enter` übernimmt den Pfad direkt.
 
@@ -171,10 +177,10 @@ Im Pfad-Auswahlmodus (`allow_edit`) öffnet `Tab` einen vorausgefüllten Edit-Di
 
 Mehrspaltige (`ls`-artige) Dateiliste, Spaltenzahl dynamisch nach Terminalbreite; sortiert nach letzter Änderung (neueste Dateien zuerst, oben links).
 
-| Taste                     | Aktion                                        |
-| ------------------------- | ---------------------------------------------- |
-| `↑` / `↓` / `Shift+Tab`   | Scrollen (nach oben)                          |
-| `Tab`                     | Scrollen (nach unten)                         |
-| `←` / `→`                 | Spalte wechseln                               |
-| Maus-Hover / Maus-Klick   | Auswahl wechselt zum Eintrag unter dem Zeiger |
-| `ESC`                               | Zurück                                        |
+| Taste                   | Aktion                                        |
+| ----------------------- | --------------------------------------------- |
+| `↑` / `↓` / `Shift+Tab` | Scrollen (nach oben)                          |
+| `Tab`                   | Scrollen (nach unten)                         |
+| `←` / `→`               | Spalte wechseln                               |
+| Maus-Hover / Maus-Klick | Auswahl wechselt zum Eintrag unter dem Zeiger |
+| `ESC`                   | Zurück                                        |

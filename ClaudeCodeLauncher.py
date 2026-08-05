@@ -553,8 +553,10 @@ def _fetch_claude_usage_stats() -> dict[str, Any] | None:
     """Liest Claude-Nutzungsdaten von der openusage-CLI (falls installiert).
 
     Returns:
-        Dict mit Keys "session" und "weekly" (je Resource-Dict aus dem
-        openusage.limits.v1-Schema), oder None wenn openusage fehlt,
+        Dict mit Keys "session", "weekly", "generated_at" (Zeitpunkt der
+        Abfrage, top-level "generatedAt") und "expires_at" (Ablauf des
+        openusage-internen Caches, verschachtelt unter
+        providers.<provider>.expiresAt), oder None wenn openusage fehlt,
         fehlschlägt oder unerwartete Daten liefert.
     """
     try:
@@ -569,15 +571,51 @@ def _fetch_claude_usage_stats() -> dict[str, Any] | None:
     if result.returncode != 0:
         return None
     try:
-        resources = json.loads(result.stdout)["providers"][OPENUSAGE_PROVIDER]["resources"]
+        data = json.loads(result.stdout)
+        provider = data["providers"][OPENUSAGE_PROVIDER]
+        resources = provider["resources"]
         session = resources["session"]
         weekly = resources["weekly"]
         return {
             "session": {"used": session["used"], "resetsAt": session["resetsAt"]},
             "weekly": {"used": weekly["used"], "resetsAt": weekly["resetsAt"]},
+            "generated_at": data["generatedAt"],
+            "expires_at": provider["expiresAt"],
         }
     except (json.JSONDecodeError, KeyError, TypeError):
         return None
+
+
+USAGE_CACHE_REQUIRED_KEYS = {
+    "session_used",
+    "session_resets_at",
+    "weekly_used",
+    "weekly_resets_at",
+    "generated_at",
+    "expires_at",
+}
+
+
+def _usage_stats_to_cache(usage: dict[str, Any]) -> dict[str, Any]:
+    """Flacht ein _fetch_claude_usage_stats()-Ergebnis für die config.toml-Speicherung ab."""
+    return {
+        "session_used": usage["session"]["used"],
+        "session_resets_at": usage["session"]["resetsAt"],
+        "weekly_used": usage["weekly"]["used"],
+        "weekly_resets_at": usage["weekly"]["resetsAt"],
+        "generated_at": usage["generated_at"],
+        "expires_at": usage["expires_at"],
+    }
+
+
+def _usage_stats_from_cache(cache: dict[str, Any]) -> dict[str, Any]:
+    """Baut aus einem flachen usage_cache-Dict wieder die Form von _fetch_claude_usage_stats()."""
+    return {
+        "session": {"used": cache["session_used"], "resetsAt": cache["session_resets_at"]},
+        "weekly": {"used": cache["weekly_used"], "resetsAt": cache["weekly_resets_at"]},
+        "generated_at": cache["generated_at"],
+        "expires_at": cache["expires_at"],
+    }
 
 
 def _format_relative_reset(reset_iso: str) -> str:
@@ -598,6 +636,19 @@ def _format_relative_reset(reset_iso: str) -> str:
     if hours:
         return f"{hours}h{minutes}m"
     return f"{minutes}m"
+
+
+def _format_absolute_time(timestamp_iso: str) -> str:
+    """Formatiert einen ISO-Zeitstempel als lokale Uhrzeit (z. B. "14:32").
+
+    Args:
+        timestamp_iso: ISO-8601-Zeitstempel, ggf. mit "Z"-Suffix (UTC).
+
+    Returns:
+        Lokale Uhrzeit im Format "HH:MM".
+    """
+    timestamp_dt = datetime.fromisoformat(timestamp_iso.replace("Z", "+00:00"))
+    return timestamp_dt.astimezone().strftime("%H:%M")
 
 
 def _render_cheatsheet(stdscr: "curses.window", height: int, width: int) -> None:
@@ -1311,7 +1362,7 @@ def _toml_scalar(value: Any) -> str:
     """Wandelt einen skalaren Config-Wert oder eine Liste von Strings in TOML-Literal-Syntax um.
 
     Args:
-        value: str (inkl. leer), bool, int oder list[str].
+        value: str (inkl. leer), bool, int, float oder list[str].
 
     Returns:
         TOML-Literal-Darstellung des Werts.
@@ -1323,6 +1374,8 @@ def _toml_scalar(value: Any) -> str:
         return "true" if value else "false"
     if isinstance(value, int):
         return str(value)
+    if isinstance(value, float):
+        return repr(value)
     if isinstance(value, str):
         return json.dumps(value)
     if isinstance(value, list):
@@ -1429,6 +1482,7 @@ class ConfigManager:
             "plan_idle_timer_duration": DEFAULT_PLAN_IDLE_TIMER_DURATION,
             "mouse_navigation_enabled": True,
             "recent_shortcuts": [],
+            "usage_cache": {},
         }
 
         if not self.config_path.exists():
@@ -2042,6 +2096,35 @@ class LauncherApp:
             return None
         return int(duration_seconds * MILLISECONDS_PER_SECOND)
 
+    def _get_cached_usage_stats(self) -> dict[str, Any] | None:
+        """Liefert Claude-Nutzungsdaten aus config.toml, ruft openusage nur bei Bedarf neu ab.
+
+        Ein Cache-Eintrag gilt bis "expires_at" als gültig und wird dann ohne
+        Subprocess-Aufruf zurückgegeben. Schlägt ein nötiger Neu-Abruf fehl (openusage
+        fehlt/Timeout/Fehler), wird als Fallback der letzte bekannte Cache-Wert
+        zurückgegeben statt die Anzeige auszublenden.
+
+        Returns:
+            Dict in der Form von _fetch_claude_usage_stats(), oder None wenn weder
+            Cache noch Live-Abfrage Daten liefern.
+        """
+        self.config_manager.reload()
+        cache = self.config_manager.config.get("usage_cache", {})
+        has_cache = USAGE_CACHE_REQUIRED_KEYS.issubset(cache)
+
+        if has_cache:
+            expires_at = datetime.fromisoformat(cache["expires_at"].replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) < expires_at:
+                return _usage_stats_from_cache(cache)
+
+        fresh = _fetch_claude_usage_stats()
+        if fresh is not None:
+            self.config_manager.config["usage_cache"] = _usage_stats_to_cache(fresh)
+            self.config_manager.save_config()
+            return fresh
+
+        return _usage_stats_from_cache(cache) if has_cache else None
+
     def _is_mouse_navigation_enabled(self) -> bool:
         """Ob Maus-Hover/Klick in curses_menu/curses_select/curses_browse aktiv ist."""
         return self.config_manager.config.get("mouse_navigation_enabled", True)
@@ -2149,10 +2232,10 @@ class LauncherApp:
         """Baut den Text für die Claude-Nutzungsstatistik-Spalte (openusage-CLI).
 
         Args:
-            usage: Ergebnis von _fetch_claude_usage_stats() oder None.
+            usage: Ergebnis von LauncherApp._get_cached_usage_stats() oder None.
 
         Returns:
-            Dreizeiliger Status-String oder None wenn keine Daten verfügbar sind.
+            Vierzeiliger Status-String oder None wenn keine Daten verfügbar sind.
         """
         if usage is None:
             return None
@@ -2160,10 +2243,12 @@ class LauncherApp:
         weekly = usage["weekly"]
         session_reset = _format_relative_reset(session["resetsAt"])
         weekly_reset = _format_relative_reset(weekly["resetsAt"])
+        updated_at = _format_absolute_time(usage["generated_at"])
         return (
             f"⚡ Claude Nutzung\n"
             f"Session {session['used']}% · {session_reset}\n"
-            f"Weekly  {weekly['used']}% · {weekly_reset}"
+            f"Weekly  {weekly['used']}% · {weekly_reset}\n"
+            f"Aktualisiert {updated_at}"
         )
 
     def _handle_sentinel(self, result: str) -> bool:
@@ -2614,7 +2699,7 @@ class LauncherApp:
                 status_text = self._build_status_text(status)
                 default_index = self._get_default_menu_index(menu_items)
                 idle_timeout_ms = self._get_plan_idle_timer_interval_ms()
-                usage_stats_text = self._build_usage_stats_text(_fetch_claude_usage_stats())
+                usage_stats_text = self._build_usage_stats_text(self._get_cached_usage_stats())
                 mouse_enabled = self._is_mouse_navigation_enabled()
 
                 try:

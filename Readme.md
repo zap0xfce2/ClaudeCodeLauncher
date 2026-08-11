@@ -83,6 +83,8 @@ Das ist der häufigste Verwendungsfall:
 - `--export /tmp/datei.json` → Dateiauswahl aus Workspace, Export als einzelne Datei
 - `--export /tmp/backup` → Folder-Modus (komplettes Workspace)
 
+Existieren im Workspace mehrere Dateien mit demselben Namen (in unterschiedlichen Unterordnern), exportiert der Single-File-Modus die erste gefundene und zeigt einen Hinweis, welche Datei das ist.
+
 ### Alle CLI-Argumente
 
 | Argument               | Beschreibung                                                             |

@@ -105,6 +105,15 @@ RSYNC_DELETE_EXCLUDED_ARG = "--delete-excluded"
 # --- VS Code CLI (Importquelle öffnen) ---
 VSCODE_BINARY = "code"
 
+# --- macOS Theme-Erkennung (launch_claude) ---
+DEFAULTS_BINARY = "defaults"
+
+# --- Plan.md Editor (handle_plan) ---
+VI_BINARY = "vi"
+
+# --- Terminal leeren vor Claude-Start (launch_claude) ---
+CLEAR_BINARY = "/usr/bin/clear"
+
 # --- Shell / Login-Shell-PATH ---
 DEFAULT_SHELL = "/bin/zsh"
 LOGIN_SHELL_PATH_PROBE_TIMEOUT = 5
@@ -1014,29 +1023,24 @@ def curses_confirm(
                     curses.color_pair(COLOR_PAIR_GRAY) | curses.A_BOLD,
                 )
 
-            # Choices
+            # Choices (Geometrie identisch zu _confirm_choice_at_position(): Präfix-
+            # Breite + Label je Choice, "  " als Trenner zwischen den Choices).
             y = start_y + len(lines) + 2
-            choice_line = "  ".join(
+            plain_line = "  ".join(
                 [f"> {c}" if i == current else f"  {c}" for i, c in enumerate(choices)]
             )
-            stdscr.addstr(y, (width - len(choice_line)) // 2, choice_line)
-
-            # Aktuelle Auswahl hervorheben
-            choice_x = (width - len(choice_line)) // 2
-            if current == 0:
-                stdscr.addstr(
-                    y,
-                    choice_x,
-                    f"> {choices[0]}",
-                    curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
+            choice_x = (width - len(plain_line)) // 2
+            x = choice_x
+            for i, choice in enumerate(choices):
+                is_current = i == current
+                label = f"> {choice}" if is_current else f"  {choice}"
+                attr = (
+                    curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD
+                    if is_current
+                    else curses.A_NORMAL
                 )
-            else:
-                stdscr.addstr(
-                    y,
-                    choice_x + len(f"> {choices[0]}") + 2,
-                    f"> {choices[1]}",
-                    curses.color_pair(COLOR_PAIR_YELLOW) | curses.A_BOLD,
-                )
+                stdscr.addstr(y, x, label, attr)
+                x += MENU_ITEM_PREFIX_WIDTH + len(choice) + 2
 
             stdscr.refresh()
 
@@ -2638,6 +2642,16 @@ class LauncherApp:
         source_file = matches[0]
         rel_path = str(source_file.relative_to(self.workspace_manager.workspace))
 
+        # Reihenfolge von rglob() ist nicht garantiert – bei mehreren Treffern
+        # den User informieren statt still die erste Fundstelle zu exportieren.
+        if len(matches) > 1:
+            curses.wrapper(
+                curses_message,
+                "Export",
+                f"Mehrere Dateien namens '{filename}' gefunden.\n"
+                f"Verwende: {rel_path}",
+            )
+
         if destination.exists():
             dont_ask = self.config_manager.config.get(
                 "dont_ask_on_export_overwrite", False
@@ -2689,7 +2703,7 @@ class LauncherApp:
             return True
 
         try:
-            subprocess.run(["/usr/bin/clear"], check=False)
+            subprocess.run([CLEAR_BINARY], check=False)
             self._apply_macos_theme()
 
             env = os.environ.copy()
@@ -2722,7 +2736,7 @@ class LauncherApp:
         in ~/.claude.json. Bei korrupter JSON-Datei wird sie überschrieben.
         """
         result = subprocess.run(
-            ["defaults", "read", "-g", "AppleInterfaceStyle"],
+            [DEFAULTS_BINARY, "read", "-g", "AppleInterfaceStyle"],
             capture_output=True,
             text=True,
         )
@@ -2759,7 +2773,7 @@ class LauncherApp:
     def handle_plan(self) -> None:
         """Öffnet Plan.md im Workspace mit vi (wird erstellt falls nicht vorhanden)."""
         plan_file = self.workspace_manager.workspace / "Plan.md"
-        subprocess.run(["vi", str(plan_file)])
+        subprocess.run([VI_BINARY, str(plan_file)])
 
     def handle_shell(self) -> None:
         """Öffnet eine Login-Shell im Workspace-Verzeichnis."""

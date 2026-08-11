@@ -118,6 +118,10 @@ OPENUSAGE_FETCH_TIMEOUT = 3
 MINUTES_PER_HOUR = 60
 MINUTES_PER_DAY = 1440
 
+# --- Zwischenablage (Browse: Dateiname kopieren) ---
+CLIPBOARD_BINARY = "pbcopy"
+CLIPBOARD_COPY_TIMEOUT = 2
+
 # --- Einrückung für Listen-Einträge (UI_PADDING_X + "> " Präfix) ---
 ITEM_INDENT_X = UI_PADDING_X + 2  # = 4
 
@@ -530,6 +534,25 @@ def _confirm_choice_at_position(
             return i
         x += item_width + 2  # 2 = Trenner aus "  ".join() in curses_confirm()
     return None
+
+
+def _copy_to_clipboard(text: str) -> bool:
+    """Kopiert `text` per pbcopy in die macOS-Zwischenablage.
+
+    Returns:
+        True bei Erfolg, False wenn pbcopy fehlschlägt oder nicht verfügbar ist.
+    """
+    try:
+        subprocess.run(
+            [CLIPBOARD_BINARY],
+            input=text,
+            text=True,
+            timeout=CLIPBOARD_COPY_TIMEOUT,
+            check=True,
+        )
+        return True
+    except (subprocess.SubprocessError, OSError):
+        return False
 
 
 def _load_login_shell_path() -> str | None:
@@ -1247,6 +1270,9 @@ def curses_browse(
 ) -> None:
     """Scrollbare Read-Only-Ansicht für Dateilisten, mehrspaltig (`ls`-artig) je nach Terminalbreite.
 
+    `Enter`/Mausklick kopiert den Dateinamen (Basename) des markierten Eintrags in
+    die Zwischenablage; die Ansicht bleibt dabei offen (Inline-Bestätigung im Hint).
+
     Args:
         stdscr: Das Curses Hauptfenster.
         title: Überschrift der Ansicht.
@@ -1290,6 +1316,8 @@ def curses_browse(
                 if stdscr.getch() == KEY_ESC:
                     return
 
+        status_message: str | None = None
+
         while True:
             stdscr.clear()
             height, width = stdscr.getmaxyx()
@@ -1332,7 +1360,11 @@ def curses_browse(
 
             # Position-Indikator und Hint
             pos_text = f"[{current + 1}/{len(items)}]"
-            hint = "↑↓ Navigieren  ←→ Spalte wechseln | ESC Zurück"
+            hint = (
+                status_message
+                if status_message is not None
+                else "↑↓ Navigieren  ←→ Spalte wechseln | ESC Zurück"
+            )
             stdscr.addstr(
                 height - 2, UI_PADDING_X, hint, curses.color_pair(COLOR_PAIR_GRAY)
             )
@@ -1346,6 +1378,7 @@ def curses_browse(
             stdscr.refresh()
 
             key = stdscr.getch()
+            status_message = None
 
             if _is_up_key(key):
                 current = (current - 1) % len(items)
@@ -1374,6 +1407,20 @@ def curses_browse(
                 )
                 if hit is not None:
                     current = hit
+                    if bstate & curses.BUTTON1_CLICKED:
+                        filename = os.path.basename(items[current][0])
+                        status_message = (
+                            f"✔ Kopiert: {filename}"
+                            if _copy_to_clipboard(filename)
+                            else "⚠ Kopieren fehlgeschlagen"
+                        )
+            elif key == ord("\n"):
+                filename = os.path.basename(items[current][0])
+                status_message = (
+                    f"✔ Kopiert: {filename}"
+                    if _copy_to_clipboard(filename)
+                    else "⚠ Kopieren fehlgeschlagen"
+                )
             elif key == KEY_ESC:
                 return
     finally:

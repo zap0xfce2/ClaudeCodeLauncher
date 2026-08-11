@@ -18,7 +18,7 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 - **Shortcut-Cheatsheet** – Taste `h` zeigt eine Vollbild-Übersicht aller Shortcuts, schließt sich bei jedem beliebigen Tastendruck wieder
 - **Dynamischer Footer** – zeigt neben `[h]`/`[q]` die vier zuletzt verwendeten Shortcuts, sitzungsübergreifend in `config.toml` gemerkt
 - **Maus-Navigation** – Hover wechselt die Auswahl, Klick bestätigt (Hauptmenü, Ja/Nein-Dialoge, Listen-Auswahl, Workspace-Inhalt anzeigen); per `config.toml` ab-/anschaltbar
-- **Workspace-Übersicht** – Mehrspaltige, nach letzter Änderung sortierte Dateiliste für schnelle Projekterkennung in breiten Terminal-Fenstern; Punkt-Ordner (z. B. `.git`) erscheinen als ein Eintrag mit rekursiv berechneter Gesamtgröße statt mit ihrem vollständigen Inhalt; 📁/📄-Symbole unterscheiden Ordner- und Datei-Einträge
+- **Workspace-Übersicht** – Mehrspaltige, nach letzter Änderung sortierte Dateiliste für schnelle Projekterkennung in breiten Terminal-Fenstern; Punkt-Ordner (z. B. `.git`) erscheinen als ein Eintrag mit rekursiv berechneter Gesamtgröße statt mit ihrem vollständigen Inhalt; 📁/📄-Symbole unterscheiden Ordner- und Datei-Einträge; `Enter`/Maus-Klick kopiert den Dateinamen des markierten Eintrags in die Zwischenablage
 - **Shell-Zugang** – Terminal im Workspace-Verzeichnis öffnen
 - **Plan-Editor** – `Plan.md` direkt in `vi` öffnen oder erstellen
 - **macOS-Theme-Sync** – Claude-Theme wird automatisch mit Dark/Light Mode synchronisiert
@@ -177,10 +177,11 @@ Im Pfad-Auswahlmodus (`allow_edit`) öffnet `Tab` einen vorausgefüllten Edit-Di
 
 Mehrspaltige (`ls`-artige) Dateiliste, Spaltenzahl dynamisch nach Terminalbreite; sortiert nach letzter Änderung (neueste Dateien zuerst, oben links).
 
-| Taste                   | Aktion                                        |
-| ----------------------- | --------------------------------------------- |
-| `↑` / `↓` / `Shift+Tab` | Scrollen (nach oben)                          |
-| `Tab`                   | Scrollen (nach unten)                         |
-| `←` / `→`               | Spalte wechseln                               |
-| Maus-Hover / Maus-Klick | Auswahl wechselt zum Eintrag unter dem Zeiger |
-| `ESC`                   | Zurück                                        |
+| Taste                   | Aktion                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------ |
+| `↑` / `↓` / `Shift+Tab` | Scrollen (nach oben)                                                                              |
+| `Tab`                   | Scrollen (nach unten)                                                                             |
+| `←` / `→`               | Spalte wechseln                                                                                   |
+| Maus-Hover              | Auswahl wechselt zum Eintrag unter dem Zeiger                                                     |
+| `Enter` / Maus-Klick    | Dateiname (Basename) des markierten Eintrags in Zwischenablage kopieren (Ansicht bleibt offen)    |
+| `ESC`                   | Zurück                                                                                             |

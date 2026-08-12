@@ -1,5 +1,5 @@
 max_history_entries = 10
-ignore_patterns = ".*.swp"
+ignore_patterns = [".Plan.md.swp"]
 export_ignore_patterns = [".*", "*.pyc", "__pycache__"]
 import_ignore_patterns = [".git", ".env", "build", "dist"]
 claude_instruction = ""

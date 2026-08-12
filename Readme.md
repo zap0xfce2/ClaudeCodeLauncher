@@ -103,8 +103,9 @@ Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann
 | ------------------------------ | ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `max_history_entries`          | int    | `10`     | Maximale Anzahl an History-Einträgen                                                                                                    |
 | `history`                      | Liste  | `[]`     | Gespeicherte Export/Import-Pfade mit Timestamps                                                                                         |
-| `export_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Export übersprungen werden; passende Einträge im Exportziel (z. B. dessen `.git`/`.env`) bleiben unangetastet     |
-| `import_ignore_patterns`       | Liste  | `[]`     | Dateimuster, die beim Import übersprungen werden                                                                                        |
+| `ignore_patterns`              | Liste  | `[]`     | Dateimuster, die in allen Kontexten gelten – Export, Import und die Leer-Prüfung (steuert ob `Reset`/`Exportieren`/`Inhalt anzeigen` im Menü erscheinen). Wird mit `export_ignore_patterns`/`import_ignore_patterns` kombiniert |
+| `export_ignore_patterns`       | Liste  | `[]`     | Zusätzliche Dateimuster nur für den Export; passende Einträge im Exportziel (z. B. dessen `.git`/`.env`) bleiben unangetastet           |
+| `import_ignore_patterns`       | Liste  | `[]`     | Zusätzliche Dateimuster nur für den Import                                                                                              |
 | `claude_env`                   | Dict   | `{}`     | Umgebungsvariablen für Claude beim Start (z. B. `{ANTHROPIC_MODEL: "claude-opus-4-6"}`)                                                 |
 | `claude_instruction`           | string | `""`     | Anweisung, die beim Start automatisch als erster Prompt an Claude übergeben wird (leer = keine)                                         |
 | `ask_for_reset`                | bool   | `true`   | Nach Folder-Export: Fragen ob Workspace zurückgesetzt werden soll                                                                       |
@@ -121,7 +122,7 @@ Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann
 **Empfohlene Ignore-Patterns:**
 
 ```toml
-export_ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
+ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
 ```
 
 ## Tastenkürzel

@@ -435,6 +435,15 @@ def test_get_exclude_args_builds_rsync_exclude_flags(tmp_path):
     assert exclude_args == ["--exclude=.git", "--exclude=*.pyc"]
 
 
+def test_get_exclude_args_combines_base_and_specific_patterns(tmp_path):
+    config_manager = ccl.ConfigManager(tmp_path / "config.toml")
+    config_manager.config["ignore_patterns"] = [".env"]
+    config_manager.config["export_ignore_patterns"] = [".git"]
+    manager = ccl.WorkspaceManager(tmp_path, config_manager)
+    exclude_args = manager._get_exclude_args("export_ignore_patterns")
+    assert exclude_args == ["--exclude=.env", "--exclude=.git"]
+
+
 @pytest.mark.parametrize(
     ("filename", "patterns", "expected"),
     [
@@ -445,6 +454,76 @@ def test_get_exclude_args_builds_rsync_exclude_flags(tmp_path):
 )
 def test_is_file_ignored(filename, patterns, expected):
     assert ccl.WorkspaceManager._is_file_ignored(filename, patterns) == expected
+
+
+def test_get_ignore_patterns_without_config_manager_returns_empty_list(tmp_path):
+    manager = ccl.WorkspaceManager(tmp_path)
+    assert manager._get_ignore_patterns("export_ignore_patterns") == []
+
+
+def test_get_ignore_patterns_without_extra_key_returns_base_only(tmp_path):
+    config_manager = ccl.ConfigManager(tmp_path / "config.toml")
+    config_manager.config["ignore_patterns"] = ["*.swp"]
+    config_manager.config["export_ignore_patterns"] = [".git"]
+    manager = ccl.WorkspaceManager(tmp_path, config_manager)
+    assert manager._get_ignore_patterns() == ["*.swp"]
+
+
+def test_get_ignore_patterns_combines_base_and_extra_key(tmp_path):
+    config_manager = ccl.ConfigManager(tmp_path / "config.toml")
+    config_manager.config["ignore_patterns"] = ["*.swp"]
+    config_manager.config["import_ignore_patterns"] = [".git"]
+    manager = ccl.WorkspaceManager(tmp_path, config_manager)
+    result = manager._get_ignore_patterns("import_ignore_patterns")
+    assert result == ["*.swp", ".git"]
+
+
+def test_is_empty_true_for_nonexistent_workspace(tmp_path):
+    manager = ccl.WorkspaceManager(tmp_path / "missing")
+    assert manager.is_empty() is True
+
+
+def test_is_empty_true_when_only_settings_local_json_present(tmp_path):
+    (tmp_path / "settings.local.json").write_text("{}")
+    manager = ccl.WorkspaceManager(tmp_path)
+    assert manager.is_empty() is True
+
+
+def test_is_empty_false_when_relevant_file_present(tmp_path):
+    (tmp_path / "CLAUDE.md").write_text("content")
+    manager = ccl.WorkspaceManager(tmp_path)
+    assert manager.is_empty() is False
+
+
+def test_is_empty_true_when_only_ignored_file_present(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".Plan.md.swp").write_text("swap")
+    config_manager = ccl.ConfigManager(tmp_path / "config.toml")
+    config_manager.config["ignore_patterns"] = ["*.swp"]
+    manager = ccl.WorkspaceManager(workspace, config_manager)
+    assert manager.is_empty() is True
+
+
+def test_is_empty_false_when_non_ignored_file_present_alongside_ignored_file(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".Plan.md.swp").write_text("swap")
+    (workspace / "Plan.md").write_text("plan")
+    config_manager = ccl.ConfigManager(tmp_path / "config.toml")
+    config_manager.config["ignore_patterns"] = ["*.swp"]
+    manager = ccl.WorkspaceManager(workspace, config_manager)
+    assert manager.is_empty() is False
+
+
+def test_get_status_excludes_ignored_files_from_count(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".Plan.md.swp").write_text("swap")
+    config_manager = ccl.ConfigManager(tmp_path / "config.toml")
+    config_manager.config["ignore_patterns"] = ["*.swp"]
+    manager = ccl.WorkspaceManager(workspace, config_manager)
+    assert manager.get_status()["is_empty"] is True
 
 
 def test_build_content_entry_for_small_file(tmp_path):

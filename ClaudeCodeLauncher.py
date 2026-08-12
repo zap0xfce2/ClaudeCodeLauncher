@@ -1587,6 +1587,7 @@ class ConfigManager:
         default_config = {
             "history": [],
             "max_history_entries": 10,
+            "ignore_patterns": [],
             "export_ignore_patterns": [],
             "import_ignore_patterns": [],
             "claude_env": {},
@@ -1745,15 +1746,18 @@ class WorkspaceManager:
         self.config_manager = config_manager
 
     def is_empty(self) -> bool:
-        """Prüft ob Workspace leer ist (ignoriert settings.local.json).
+        """Prüft ob Workspace leer ist (ignoriert settings.local.json und ignore_patterns).
 
         Returns:
             True wenn keine relevanten Dateien vorhanden sind.
         """
         if not self.workspace.exists():
             return True
+        patterns = self._get_ignore_patterns()
         return not any(
-            item.is_file() and item != self.settings_file
+            item.is_file()
+            and item != self.settings_file
+            and self._is_file_ignored(item.name, patterns) is None
             for item in self.workspace.rglob("*")
         )
 
@@ -1763,11 +1767,14 @@ class WorkspaceManager:
         Returns:
             Dict mit Schlüsseln: is_empty, file_count, size_mb.
         """
+        patterns = self._get_ignore_patterns()
         relevant_files = (
             [
                 item
                 for item in self.workspace.rglob("*")
-                if item.is_file() and item != self.settings_file
+                if item.is_file()
+                and item != self.settings_file
+                and self._is_file_ignored(item.name, patterns) is None
             ]
             if self.workspace.exists()
             else []
@@ -1862,21 +1869,35 @@ class WorkspaceManager:
         else:
             self.workspace.mkdir(parents=True, exist_ok=True)
 
-    def _get_exclude_args(self, pattern_key: str) -> list[str]:
-        """Baut rsync --exclude-Argumente aus den konfigurierten Ignore-Patterns.
+    def _get_ignore_patterns(self, extra_key: str | None = None) -> list[str]:
+        """Kombiniert die globale ignore_patterns-Basisliste mit optionalen Zusatz-Patterns.
 
         Args:
-            pattern_key: Config-Schlüssel für die Patterns.
+            extra_key: Config-Schlüssel für kontextspezifische Zusatz-Patterns
+                (z. B. "export_ignore_patterns"). None liefert nur die Basisliste.
+
+        Returns:
+            Kombinierte Liste aus globalen und kontextspezifischen fnmatch-Patterns.
+        """
+        if not self.config_manager:
+            return []
+        base = self.config_manager.config.get("ignore_patterns", [])
+        extra = self.config_manager.config.get(extra_key, []) if extra_key else []
+        return [*base, *extra]
+
+    def _get_exclude_args(self, pattern_key: str) -> list[str]:
+        """Baut rsync --exclude-Argumente aus globalen + kontextspezifischen Ignore-Patterns.
+
+        Args:
+            pattern_key: Config-Schlüssel für kontextspezifische Zusatz-Patterns.
 
         Returns:
             Liste von "--exclude=<pattern>"-Argumenten (leer wenn keine Patterns).
         """
-        patterns = (
-            self.config_manager.config.get(pattern_key, [])
-            if self.config_manager
-            else []
-        )
-        return [f"--exclude={pattern}" for pattern in patterns]
+        return [
+            f"--exclude={pattern}"
+            for pattern in self._get_ignore_patterns(pattern_key)
+        ]
 
     def _rsync_mirror(
         self,
@@ -2052,11 +2073,7 @@ class WorkspaceManager:
             return False
 
         # Warnung wenn Datei einem Ignore-Pattern entspricht (kein Abbruch)
-        ignore_patterns = (
-            self.config_manager.config.get("export_ignore_patterns", [])
-            if self.config_manager
-            else []
-        )
+        ignore_patterns = self._get_ignore_patterns("export_ignore_patterns")
         matched_pattern = self._is_file_ignored(source_file.name, ignore_patterns)
         if matched_pattern:
             curses.wrapper(
@@ -2092,11 +2109,7 @@ class WorkspaceManager:
             return False
 
         # Warnung wenn Datei einem Ignore-Pattern entspricht (kein Abbruch)
-        ignore_patterns = (
-            self.config_manager.config.get("import_ignore_patterns", [])
-            if self.config_manager
-            else []
-        )
+        ignore_patterns = self._get_ignore_patterns("import_ignore_patterns")
         matched_pattern = self._is_file_ignored(source_file.name, ignore_patterns)
         if matched_pattern:
             curses.wrapper(

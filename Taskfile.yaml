@@ -41,3 +41,8 @@ tasks:
     desc: "Entfernt temporäres Build-Verzeichnis"
     cmds:
       - rm -rf {{.BUILD_DIR}}
+
+  test:
+    desc: "Führe die Tests aus"
+    cmds:
+      - uv run pytest

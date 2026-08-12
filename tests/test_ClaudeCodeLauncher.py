@@ -374,6 +374,26 @@ def test_add_to_history_deduplicates_same_path_and_type(tmp_path):
     assert len(manager.config["history"]) == 1
 
 
+def test_add_to_history_synthetic_sets_flag(tmp_path):
+    manager = ccl.ConfigManager(tmp_path / "config.toml")
+    manager.add_to_history(Path("/workspace/a"), "export", synthetic=True)
+    assert manager.config["history"][0]["synthetic"] is True
+
+
+def test_add_to_history_without_synthetic_omits_flag(tmp_path):
+    manager = ccl.ConfigManager(tmp_path / "config.toml")
+    manager.add_to_history(Path("/workspace/a"), "export")
+    assert "synthetic" not in manager.config["history"][0]
+
+
+def test_add_to_history_real_export_replaces_synthetic_entry(tmp_path):
+    manager = ccl.ConfigManager(tmp_path / "config.toml")
+    manager.add_to_history(Path("/workspace/a"), "export", synthetic=True)
+    manager.add_to_history(Path("/workspace/a"), "export")
+    assert len(manager.config["history"]) == 1
+    assert "synthetic" not in manager.config["history"][0]
+
+
 def test_add_to_history_raises_on_invalid_type(tmp_path):
     manager = ccl.ConfigManager(tmp_path / "config.toml")
     with pytest.raises(ValueError):

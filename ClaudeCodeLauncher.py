@@ -1637,12 +1637,19 @@ class ConfigManager:
         with open(self.config_path, "w") as f:
             f.write(_dump_toml(config))
 
-    def add_to_history(self, path: Path, history_type: str) -> None:
+    def add_to_history(
+        self, path: Path, history_type: str, synthetic: bool = False
+    ) -> None:
         """Fügt Pfad zur History hinzu, limitiert auf max_history_entries.
 
         Args:
             path: Pfad der Export- oder Import-Operation.
             history_type: "export" oder "import".
+            synthetic: True für automatisch (nicht vom Nutzer ausgelöste) angelegte
+                Einträge, z. B. der Export-Eintrag, den ein Import zum selben Pfad
+                anlegt, damit Quick-Export (`e`) danach sofort funktioniert. Wird
+                von der "Letzter Export"-Statuszeile ignoriert (siehe
+                LauncherApp._build_status_text()).
 
         Raises:
             ValueError: Wenn history_type ungültig ist.
@@ -1661,14 +1668,14 @@ class ConfigManager:
             for h in history
             if h.get("path") != path_str or h.get("type", history_type) != history_type
         ]
-        history.insert(
-            0,
-            {
-                "path": path_str,
-                "timestamp": datetime.now().isoformat(),
-                "type": history_type,
-            },
-        )
+        entry: dict[str, Any] = {
+            "path": path_str,
+            "timestamp": datetime.now().isoformat(),
+            "type": history_type,
+        }
+        if synthetic:
+            entry["synthetic"] = True
+        history.insert(0, entry)
 
         self.config["history"] = history[: self.config["max_history_entries"]]
         self.save_config()
@@ -2314,7 +2321,10 @@ class LauncherApp:
         footer = "  " + "  ".join(footer_segments)
 
         all_history = self.config_manager.config.get("history", [])
-        last_export = next((h for h in all_history if h.get("type") == "export"), None)
+        last_export = next(
+            (h for h in all_history if h.get("type") == "export" and not h.get("synthetic")),
+            None,
+        )
         last_import = next((h for h in all_history if h.get("type") == "import"), None)
         last_reset_ts = self.config_manager.config.get("last_reset_timestamp")
         export_line = self._get_export_line(last_export, last_reset_ts)
@@ -2698,10 +2708,12 @@ class LauncherApp:
             success = self.workspace_manager.import_file_from(source)
             if success:
                 self.config_manager.add_to_history(source, "import")
+                self.config_manager.add_to_history(source, "export", synthetic=True)
         elif source.is_dir():
             success = self.workspace_manager.import_from(source)
             if success:
                 self.config_manager.add_to_history(source, "import")
+                self.config_manager.add_to_history(source, "export", synthetic=True)
         else:
             curses.wrapper(curses_message, "Fehler", f"Pfad existiert nicht:\n{source}")
 

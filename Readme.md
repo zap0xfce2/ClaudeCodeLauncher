@@ -11,7 +11,7 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 - **Session-Management** – Neue Session im Workspace starten
 - **Export / Import** – Workspace als Backup sichern und wiederherstellen (Folder-Modus via `rsync`: Löschungen im Workspace werden ins Exportziel übertragen); jeder Export warnt, wenn das Ziel vom letzten Import-Pfad abweicht
 - **Single-File-Modus** – Einzelne Dateien exportieren oder importieren
-- **History** – Zuletzt verwendete Pfade werden gespeichert und vorgeschlagen
+- **History** – Zuletzt verwendete Pfade werden gespeichert und vorgeschlagen; ein Import legt automatisch einen Export-Eintrag zum selben Pfad an, damit Quick-Export (`e`) direkt danach ohne Pfadauswahl funktioniert
 - **VS-Code-Sprung** – Importquelle (letzter Import-Pfad) direkt in VS Code öffnen
 - **Ignore-Patterns** – Konfigurierbare Filter für Export und Import (z. B. `.git`, `.env`)
 - **Config-Hotkeys** – Optionen direkt im Hauptmenü togglen
@@ -102,7 +102,7 @@ Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann
 | Option                         | Typ    | Standard | Beschreibung                                                                                                                            |
 | ------------------------------ | ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `max_history_entries`          | int    | `10`     | Maximale Anzahl an History-Einträgen                                                                                                    |
-| `history`                      | Liste  | `[]`     | Gespeicherte Export/Import-Pfade mit Timestamps                                                                                         |
+| `history`                      | Liste  | `[]`     | Gespeicherte Export/Import-Pfade mit Timestamps. Ein Import legt zusätzlich automatisch einen Export-Eintrag zum selben Pfad an (markiert intern als `synthetic`, taucht nicht als „Letzter Export“ im Menü auf, ermöglicht aber sofortiges Quick-Export via `e`)                                                                                         |
 | `ignore_patterns`              | Liste  | `[]`     | Dateimuster, die in allen Kontexten gelten – Export, Import und die Leer-Prüfung (steuert ob `Reset`/`Exportieren`/`Inhalt anzeigen` im Menü erscheinen). Wird mit `export_ignore_patterns`/`import_ignore_patterns` kombiniert |
 | `export_ignore_patterns`       | Liste  | `[]`     | Zusätzliche Dateimuster nur für den Export; passende Einträge im Exportziel (z. B. dessen `.git`/`.env`) bleiben unangetastet           |
 | `import_ignore_patterns`       | Liste  | `[]`     | Zusätzliche Dateimuster nur für den Import                                                                                              |

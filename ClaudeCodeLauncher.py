@@ -22,7 +22,6 @@ COLOR_PAIR_ORANGE = 1
 COLOR_PAIR_GRAY = 2
 COLOR_PAIR_GREEN = 3
 COLOR_PAIR_YELLOW = 4
-COLOR_PAIR_WHITE = 5
 
 # --- xterm256-Farben mit 8-Color-Fallback ---
 MIN_COLORS_FOR_XTERM256 = 256
@@ -170,7 +169,6 @@ def _init_curses_colors(stdscr: "curses.window") -> None:
         ),
         -1,
     )
-    curses.init_pair(COLOR_PAIR_WHITE, curses.COLOR_WHITE, -1)
 
 
 def _is_up_key(key: int) -> bool:
@@ -754,6 +752,29 @@ def _render_cheatsheet(stdscr: "curses.window", height: int, width: int) -> None
     stdscr.refresh()
 
 
+def _enable_mouse_tracking() -> None:
+    """Aktiviert Curses-Mausklicks + XTerm-Motion-Tracking (Hover-Support).
+
+    REPORT_MOUSE_POSITION zusätzlich zu BUTTON1_CLICKED, sonst meldet curses nur
+    Klicks, keine reine Bewegung (kein Hover-Highlight möglich).
+    """
+    curses.mousemask(curses.BUTTON1_CLICKED | curses.REPORT_MOUSE_POSITION)
+    sys.stdout.write(XTERM_ENABLE_MOUSE_MOTION_TRACKING)
+    sys.stdout.flush()
+
+
+def _disable_mouse_tracking() -> None:
+    """Deaktiviert Maus-Tracking wieder.
+
+    Muss vor endwin() (in curses.wrapper) explizit erfolgen, sonst bleibt das
+    Terminal in manchen Emulatoren im Mouse-Tracking-Modus (Escape-Sequenz-Müll
+    in Shell / nachfolgenden curses_*-Dialogen).
+    """
+    sys.stdout.write(XTERM_DISABLE_MOUSE_MOTION_TRACKING)
+    sys.stdout.flush()
+    curses.mousemask(0)
+
+
 def curses_menu(
     stdscr: "curses.window",
     banner_text: str,
@@ -786,11 +807,7 @@ def curses_menu(
     """
     _init_curses_colors(stdscr)
     if mouse_enabled:
-        # REPORT_MOUSE_POSITION zusätzlich zu BUTTON1_CLICKED, sonst meldet curses nur
-        # Klicks, keine reine Bewegung (kein Hover-Highlight möglich).
-        curses.mousemask(curses.BUTTON1_CLICKED | curses.REPORT_MOUSE_POSITION)
-        sys.stdout.write(XTERM_ENABLE_MOUSE_MOTION_TRACKING)
-        sys.stdout.flush()
+        _enable_mouse_tracking()
     current = default_index
 
     if idle_timeout_ms is not None:
@@ -971,13 +988,8 @@ def curses_menu(
             elif key == ord("v"):
                 return "open_import_source"
     finally:
-        # Mausmodus muss vor endwin() (in curses.wrapper) explizit deaktiviert werden,
-        # sonst bleibt das Terminal in manchen Emulatoren im Mouse-Tracking-Modus
-        # (Escape-Sequenz-Müll in Shell / nachfolgenden curses_*-Dialogen).
         if mouse_enabled:
-            sys.stdout.write(XTERM_DISABLE_MOUSE_MOTION_TRACKING)
-            sys.stdout.flush()
-            curses.mousemask(0)
+            _disable_mouse_tracking()
 
 
 def curses_confirm(
@@ -999,9 +1011,7 @@ def curses_confirm(
     """
     _init_curses_colors(stdscr)
     if mouse_enabled:
-        curses.mousemask(curses.BUTTON1_CLICKED | curses.REPORT_MOUSE_POSITION)
-        sys.stdout.write(XTERM_ENABLE_MOUSE_MOTION_TRACKING)
-        sys.stdout.flush()
+        _enable_mouse_tracking()
     current = 0 if default else 1
     choices = ["Ja", "Nein"]
 
@@ -1075,9 +1085,7 @@ def curses_confirm(
                 return False
     finally:
         if mouse_enabled:
-            sys.stdout.write(XTERM_DISABLE_MOUSE_MOTION_TRACKING)
-            sys.stdout.flush()
-            curses.mousemask(0)
+            _disable_mouse_tracking()
 
 
 def curses_input(
@@ -1184,9 +1192,7 @@ def curses_select(
     """
     _init_curses_colors(stdscr)
     if mouse_enabled:
-        curses.mousemask(curses.BUTTON1_CLICKED | curses.REPORT_MOUSE_POSITION)
-        sys.stdout.write(XTERM_ENABLE_MOUSE_MOTION_TRACKING)
-        sys.stdout.flush()
+        _enable_mouse_tracking()
     current = default_index
 
     try:
@@ -1260,9 +1266,7 @@ def curses_select(
                 return None
     finally:
         if mouse_enabled:
-            sys.stdout.write(XTERM_DISABLE_MOUSE_MOTION_TRACKING)
-            sys.stdout.flush()
-            curses.mousemask(0)
+            _disable_mouse_tracking()
 
 
 def curses_browse(
@@ -1286,9 +1290,7 @@ def curses_browse(
     """
     _init_curses_colors(stdscr)
     if mouse_enabled:
-        curses.mousemask(curses.BUTTON1_CLICKED | curses.REPORT_MOUSE_POSITION)
-        sys.stdout.write(XTERM_ENABLE_MOUSE_MOTION_TRACKING)
-        sys.stdout.flush()
+        _enable_mouse_tracking()
 
     try:
         height, width = stdscr.getmaxyx()
@@ -1429,9 +1431,7 @@ def curses_browse(
                 return
     finally:
         if mouse_enabled:
-            sys.stdout.write(XTERM_DISABLE_MOUSE_MOTION_TRACKING)
-            sys.stdout.flush()
-            curses.mousemask(0)
+            _disable_mouse_tracking()
 
 
 def curses_message(

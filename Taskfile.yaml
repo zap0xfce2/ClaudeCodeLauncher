@@ -26,11 +26,12 @@ tasks:
       BUILD_DATE:
         sh: date +%y%m%d%H%M
     cmds:
-      # Kopie mit gesetzter Version im tmp-Verzeichnis anlegen (keine Schreibzugriffe aufs Netzlaufwerk)
+      # Entry-Point + Package mit gesetzter Version im tmp-Verzeichnis anlegen (keine Schreibzugriffe aufs Netzlaufwerk)
       - mkdir -p {{.BUILD_DIR}}
-      - cp ClaudeCodeLauncher.py {{.BUILD_DIR}}/_ClaudeCodeLauncher_versioned.py
-      - sed -i '' 's/VERSION = "vYYMMDDhhmm"/VERSION = "v{{.BUILD_DATE}}"/' {{.BUILD_DIR}}/_ClaudeCodeLauncher_versioned.py
-      - uv run python -m nuitka --mode=onefile --output-dir={{.BUILD_DIR}} --output-filename=ClaudeCodeLauncher --remove-output --assume-yes-for-downloads --quiet {{.BUILD_DIR}}/_ClaudeCodeLauncher_versioned.py
+      - cp main.py {{.BUILD_DIR}}/main.py
+      - cp -R claude_code_launcher {{.BUILD_DIR}}/claude_code_launcher
+      - sed -i '' 's/VERSION = "vYYMMDDhhmm"/VERSION = "v{{.BUILD_DATE}}"/' {{.BUILD_DIR}}/main.py
+      - uv run python -m nuitka --mode=onefile --output-dir={{.BUILD_DIR}} --output-filename=ClaudeCodeLauncher --remove-output --assume-yes-for-downloads --quiet {{.BUILD_DIR}}/main.py
 
   install:
     desc: "Installiere das Build"

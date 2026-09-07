@@ -12,12 +12,10 @@ from .config_manager import ConfigManager
 from .constants import (
     ACTION_TO_SHORTCUT,
     CLEAR_BINARY,
-    DEFAULT_PLAN_IDLE_TIMER_DURATION,
     DEFAULT_SHELL,
     DEFAULTS_BINARY,
-    MILLISECONDS_PER_SECOND,
+    PROQI_BINARY,
     SHORTCUT_LABELS,
-    VI_BINARY,
     VSCODE_BINARY,
 )
 from .ui_curses import (
@@ -58,43 +56,19 @@ class LauncherApp:
         self.export_path = export_path
         self.import_path = import_path
 
-    def _plan_swap_file_exists(self) -> bool:
-        """True wenn Plan.md gerade in vim geöffnet ist (Swap-Datei .Plan.md.swp vorhanden)."""
-        swap_file = self.workspace_manager.workspace / ".Plan.md.swp"
-        return swap_file.exists()
-
-    def _get_default_menu_index(self, menu_items: list[tuple[str, str]]) -> int:
-        """Setzt den Cursor auf 'Sitzung starten' wenn Plan.md gerade in vim bearbeitet wird."""
-        if not self._plan_swap_file_exists():
-            return 0
-        for index, (action, _label) in enumerate(menu_items):
-            if action == "start":
-                return index
-        return 0
-
-    def _get_plan_idle_timer_interval_ms(self) -> int | None:
-        """Poll-Intervall in ms für den Plan-Idle-Timer, oder None wenn deaktiviert/ungültig."""
-        if not self.config_manager.config.get("plan_idle_timer_enabled", True):
-            return None
-        duration_seconds = self.config_manager.config.get(
-            "plan_idle_timer_duration", DEFAULT_PLAN_IDLE_TIMER_DURATION
-        )
-        if not isinstance(duration_seconds, (int, float)) or duration_seconds <= 0:
-            return None
-        return int(duration_seconds * MILLISECONDS_PER_SECOND)
-
-    def _get_cached_usage_stats(self) -> dict[str, Any] | None:
+    def _get_cached_usage_stats(self, force: bool = False) -> dict[str, Any] | None:
         """Liefert Claude-Nutzungsdaten aus config.toml, ruft openusage nur bei abgelaufenem Cache neu ab.
 
         Schlägt ein nötiger Neu-Abruf fehl (openusage fehlt/Timeout/Fehler), wird als
         Fallback der letzte bekannte Cache-Wert zurückgegeben statt die Anzeige
-        auszublenden.
+        auszublenden. `force=True` (manueller Refresh via `r`) überspringt die
+        `expires_at`-Prüfung und fragt openusage immer neu ab.
         """
         self.config_manager.reload()
         cache = self.config_manager.config.get("usage_cache", {})
         has_cache = USAGE_CACHE_REQUIRED_KEYS.issubset(cache)
 
-        if has_cache:
+        if not force and has_cache:
             expires_at = datetime.fromisoformat(
                 cache["expires_at"].replace("Z", "+00:00")
             )
@@ -118,7 +92,7 @@ class LauncherApp:
         is_empty = self.workspace_manager.is_empty()
         items: list[tuple[str, str]] = []
 
-        items.append(("plan", "📝 Plan schreiben"))
+        items.append(("plan", "📝 Prompts verwalten"))
         items.append(("start", "🚀 Sitzung starten"))
 
         if not is_empty:
@@ -210,17 +184,10 @@ class LauncherApp:
         )
 
     def _handle_sentinel(self, result: str) -> bool:
-        """Verarbeitet Sentinel-Rückgaben aus dem Menü (Refresh, Toggle-Hotkeys).
-
-        `"__refresh__"` (manueller Tastendruck `r`) trackt den Shortcut zusätzlich,
-        `"__idle_refresh__"` (automatischer Plan-Idle-Timer) bewusst nicht.
-        """
+        """Verarbeitet Sentinel-Rückgaben aus dem Menü (Refresh, Toggle-Hotkeys)."""
         if result == "__refresh__":
             self.config_manager.reload()
             self.config_manager.record_shortcut_usage("r")
-            return True
-        if result == "__idle_refresh__":
-            self.config_manager.reload()
             return True
         if result == "__toggle_ask_reset__":
             self.config_manager.toggle_bool_option("ask_for_reset")
@@ -624,10 +591,18 @@ class LauncherApp:
             self._is_mouse_navigation_enabled(),
         )
 
-    def handle_plan(self) -> None:
-        """Öffnet Plan.md im Workspace mit vi (wird erstellt falls nicht vorhanden)."""
-        plan_file = self.workspace_manager.workspace / "Plan.md"
-        subprocess.run([VI_BINARY, str(plan_file)])
+    def handle_prompt_sessions(self) -> None:
+        """Öffnet proqis Session-Browser (-r) im Workspace-Verzeichnis."""
+        try:
+            subprocess.run(
+                [PROQI_BINARY, "-r"], cwd=str(self.workspace_manager.workspace)
+            )
+        except FileNotFoundError:
+            curses.wrapper(
+                curses_message,
+                "proqi",
+                "proqi-Kommando nicht gefunden – https://github.com/oborchers/proqi installieren",
+            )
 
     def handle_shell(self) -> None:
         """Öffnet eine Login-Shell im Workspace-Verzeichnis."""
@@ -657,7 +632,7 @@ class LauncherApp:
         elif action == "browse":
             self.handle_browse()
         elif action == "plan":
-            self.handle_plan()
+            self.handle_prompt_sessions()
         elif action == "shell":
             self.handle_shell()
 
@@ -674,15 +649,15 @@ class LauncherApp:
                 self.handle_import()
                 return
 
+            force_usage_refresh = False
             while True:
                 status = self.workspace_manager.get_status()
                 menu_items = self.get_menu_items()
                 status_text = self._build_status_text(status)
-                default_index = self._get_default_menu_index(menu_items)
-                idle_timeout_ms = self._get_plan_idle_timer_interval_ms()
                 usage_stats_text = self._build_usage_stats_text(
-                    self._get_cached_usage_stats()
+                    self._get_cached_usage_stats(force=force_usage_refresh)
                 )
+                force_usage_refresh = False
                 mouse_enabled = self._is_mouse_navigation_enabled()
 
                 try:
@@ -692,9 +667,6 @@ class LauncherApp:
                         self.version,
                         status_text,
                         menu_items,
-                        default_index,
-                        idle_timeout_ms,
-                        self._plan_swap_file_exists,
                         usage_stats_text,
                         mouse_enabled,
                     )
@@ -713,6 +685,8 @@ class LauncherApp:
                     break
 
                 if self._handle_sentinel(result):
+                    if result == "__refresh__":
+                        force_usage_refresh = True
                     continue
 
                 continue_loop, wait_for_enter = self.handle_action(result)

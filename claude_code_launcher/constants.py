@@ -57,7 +57,7 @@ SHORTCUT_LABELS: dict[str, str] = {
     "e": "Quick Export",
     "i": "Quick Import",
     "v": "VS Code",
-    "p": "Plan schreiben",
+    "p": "Prompts verwalten",
     "x": "Nach Export zurücksetzen",
     "o": "Überschreiben bestätigen",
     "h": "Hilfe",
@@ -77,10 +77,6 @@ ACTION_TO_SHORTCUT: dict[str, str] = {
 BYTES_PER_KB = 1024
 BYTES_PER_MB = 1024 * 1024
 
-# --- Plan-Idle-Timer ---
-MILLISECONDS_PER_SECOND = 1000
-DEFAULT_PLAN_IDLE_TIMER_DURATION = 10
-
 # --- rsync (Folder-Mode Export/Import) ---
 RSYNC_BINARY = "rsync"
 RSYNC_BASE_ARGS = ["-a", "--delete"]
@@ -92,8 +88,8 @@ VSCODE_BINARY = "code"
 # --- macOS Theme-Erkennung (launch_claude) ---
 DEFAULTS_BINARY = "defaults"
 
-# --- Plan.md Editor (handle_plan) ---
-VI_BINARY = "vi"
+# --- proqi CLI (Prompt-Sessions durchsuchen, handle_prompt_sessions) ---
+PROQI_BINARY = "proqi"
 
 # --- Terminal leeren vor Claude-Start (launch_claude) ---
 CLEAR_BINARY = "/usr/bin/clear"
@@ -107,7 +103,11 @@ PATH_PROBE_END_MARKER = "__PATH_END__"
 # --- openusage CLI (Claude-Nutzungsstatistik) ---
 OPENUSAGE_BINARY = "openusage"
 OPENUSAGE_PROVIDER = "claude"
-OPENUSAGE_FETCH_TIMEOUT = 3
+# Unser usage_cache.expires_at ist 1:1 aus openusages eigenem expiresAt übernommen, daher
+# trifft jeder Refresh zwangsläufig auf einen kalten (nicht gecachten) Abruf, nie einen
+# warmen. Gemessener kalter Abruf: ~3.1s – 3s Timeout ließ Refreshes praktisch immer
+# fehlschlagen und den Cache wochenlang einfrieren.
+OPENUSAGE_FETCH_TIMEOUT = 10
 MINUTES_PER_HOUR = 60
 MINUTES_PER_DAY = 1440
 

@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .constants import DEFAULT_PLAN_IDLE_TIMER_DURATION, RECENT_SHORTCUTS_MAX_ENTRIES
+from .constants import RECENT_SHORTCUTS_MAX_ENTRIES
 from .toml_io import _dump_toml
 
 
@@ -37,8 +37,6 @@ class ConfigManager:
             "claude_instruction": "",
             "ask_for_reset": True,
             "dont_ask_on_export_overwrite": False,
-            "plan_idle_timer_enabled": True,
-            "plan_idle_timer_duration": DEFAULT_PLAN_IDLE_TIMER_DURATION,
             "mouse_navigation_enabled": True,
             "recent_shortcuts": [],
             "usage_cache": {},

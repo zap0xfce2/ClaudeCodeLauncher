@@ -4,7 +4,6 @@ kein Wissen über ConfigManager/WorkspaceManager/LauncherApp, Datenfluss nur üb
 import curses
 import os
 import sys
-from collections.abc import Callable
 from typing import Literal, overload
 
 from .constants import (
@@ -366,29 +365,14 @@ def curses_menu(
     version_text: str,
     status_text: str,
     menu_items: list[tuple[str, str]],
-    default_index: int = 0,
-    idle_timeout_ms: int | None = None,
-    idle_refresh_predicate: Callable[[], bool] | None = None,
     usage_stats_text: str | None = None,
     mouse_enabled: bool = True,
 ) -> str | None:
-    """Hauptmenü: Banner+Version oben, zwei Menüspalten links, Status-Info rechts, optionaler Idle-Timer.
-
-    idle_refresh_predicate liefert bei jedem Idle-Tick einen Vergleichswert; ändert er
-    sich gegenüber dem Stand bei Funktionseintritt, wird erst dann ein Refresh ausgelöst
-    (verhindert Flackern durch Refresh bei jedem Tick). None = jeder Tick refresht sofort.
-    """
+    """Hauptmenü: Banner+Version oben, zwei Menüspalten links, Status-Info rechts."""
     _init_curses_colors(stdscr)
     if mouse_enabled:
         _enable_mouse_tracking()
-    current = default_index
-
-    if idle_timeout_ms is not None:
-        stdscr.timeout(idle_timeout_ms)
-
-    initial_predicate_state = (
-        idle_refresh_predicate() if idle_refresh_predicate is not None else None
-    )
+    current = 0
 
     try:
         while True:
@@ -496,14 +480,7 @@ def curses_menu(
 
             key = stdscr.getch()
 
-            if key == -1:
-                if (
-                    idle_refresh_predicate is None
-                    or idle_refresh_predicate() != initial_predicate_state
-                ):
-                    return "__idle_refresh__"
-                continue
-            elif _is_up_key(key):
+            if _is_up_key(key):
                 current = (current - 1) % len(menu_items)
             elif _is_down_key(key):
                 current = (current + 1) % len(menu_items)
@@ -541,12 +518,8 @@ def curses_menu(
             elif key == ord("o"):
                 return "__toggle_overwrite_ask__"
             elif key == ord("h"):
-                if idle_timeout_ms is not None:
-                    stdscr.timeout(-1)
                 _render_cheatsheet(stdscr, height, width)
                 stdscr.getch()
-                if idle_timeout_ms is not None:
-                    stdscr.timeout(idle_timeout_ms)
                 continue
             elif key == ord("s"):
                 return "start"

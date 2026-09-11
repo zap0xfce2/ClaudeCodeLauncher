@@ -63,6 +63,12 @@ def test_add_to_history_deduplicates_same_path_and_type(tmp_path):
     assert len(manager.config["history"]) == 1
 
 
+def test_add_to_history_stores_remote_path_unchanged(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.add_to_history("user@host:/backup", "export")
+    assert manager.config["history"][0]["path"] == "user@host:/backup"
+
+
 def test_add_to_history_synthetic_sets_flag(tmp_path):
     manager = ConfigManager(tmp_path / "config.toml")
     manager.add_to_history(Path("/workspace/a"), "export", synthetic=True)

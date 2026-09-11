@@ -11,6 +11,7 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 - **Session-Management** – Neue Session im Workspace starten
 - **Export / Import** – Workspace als Backup sichern und wiederherstellen (Folder-Modus via `rsync`: Löschungen im Workspace werden ins Exportziel übertragen); jeder Export warnt, wenn das Ziel vom letzten Import-Pfad abweicht
 - **Single-File-Modus** – Einzelne Dateien exportieren oder importieren
+- **SSH-Remote-Ziele** – Export/Import unterstützen neben lokalen Pfaden auch rsync-Remote-Ziele im SSH-Style (`user@host:/pfad` oder `host:/pfad`), sowohl im Folder- als auch im Single-File-Modus
 - **History** – Zuletzt verwendete Pfade werden gespeichert und vorgeschlagen; ein Import legt automatisch einen Export-Eintrag zum selben Pfad an, damit Quick-Export (`e`) direkt danach ohne Pfadauswahl funktioniert
 - **VS-Code-Sprung** – Importquelle (letzter Import-Pfad) direkt in VS Code öffnen
 - **Ignore-Patterns** – Konfigurierbare Filter für Export und Import (z. B. `.git`, `.env`)
@@ -27,7 +28,7 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 ## Voraussetzungen
 
 - Python 3.11+
-- `rsync` (für Folder-Export/-Import; auf macOS vorinstalliert)
+- `rsync` (für Export/Import, Folder- wie Single-File-Modus, auch für SSH-Remote-Ziele; auf macOS vorinstalliert)
 - `code`-CLI von VS Code (optional, nur für „Importquelle in VS Code öffnen")
 - [proqi](https://github.com/oborchers/proqi)-CLI (optional, nur für „Prompts verwalten")
 - [Task](https://taskfile.dev) (nur für den Build)
@@ -75,6 +76,9 @@ Das ist der häufigste Verwendungsfall:
 # Importieren
 ./ClaudeCodeLauncher /pfad/zu/meinem-workspace --import /pfad/zum/backup
 
+# Export zu einem SSH-Remote-Ziel (rsync)
+./ClaudeCodeLauncher /pfad/zu/meinem-workspace --export user@host:/pfad/zum/backup
+
 # Mit benutzerdefiniertem Claude Binary
 ./ClaudeCodeLauncher /pfad/zu/meinem-workspace --claude-binary /usr/local/bin/claude
 ```
@@ -86,13 +90,15 @@ Das ist der häufigste Verwendungsfall:
 
 Existieren im Workspace mehrere Dateien mit demselben Namen (in unterschiedlichen Unterordnern), exportiert der Single-File-Modus die erste gefundene und zeigt einen Hinweis, welche Datei das ist.
 
+**SSH-Remote-Ziele** (`user@host:/pfad` oder `host:/pfad`) funktionieren identisch für Folder- und Single-File-Modus – Vorab-Checks wie "Ziel existiert bereits" entfallen dabei (ohne SSH-Verbindung nicht prüfbar), rsync übernimmt Merge/Overwrite selbst. `rsync://`-Daemon-Syntax wird nicht unterstützt.
+
 ### Alle CLI-Argumente
 
 | Argument               | Beschreibung                                                             |
 | ---------------------- | ------------------------------------------------------------------------ |
 | `workspace`            | Pfad zum Arbeitsverzeichnis der Claude-Session (Workspace) **(Pflicht)** |
-| `--export PATH`        | Exportiert Workspace direkt zum angegebenen Pfad                         |
-| `--import PATH`        | Importiert Workspace direkt vom angegebenen Pfad                         |
+| `--export PATH`        | Exportiert Workspace direkt zum angegebenen Pfad (lokal oder `user@host:/pfad`) |
+| `--import PATH`        | Importiert Workspace direkt vom angegebenen Pfad (lokal oder `user@host:/pfad`) |
 | `--config PATH`        | Pfad zur Config-Datei (Standard: `./config.toml`)                        |
 | `--claude-binary PATH` | Pfad zum Claude Binary (Standard: automatische Erkennung via PATH)       |
 

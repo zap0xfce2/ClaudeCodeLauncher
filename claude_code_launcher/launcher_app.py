@@ -5,7 +5,7 @@ import json
 import os
 import subprocess
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from .config_manager import ConfigManager
@@ -18,6 +18,7 @@ from .constants import (
     SHORTCUT_LABELS,
     VSCODE_BINARY,
 )
+from .remote_target import _is_remote_target, _remote_path_part
 from .ui_curses import (
     curses_browse,
     curses_confirm,
@@ -46,8 +47,8 @@ class LauncherApp:
         config_manager: ConfigManager,
         claude_binary: Path,
         version: str,
-        export_path: Path | None = None,
-        import_path: Path | None = None,
+        export_path: Path | str | None = None,
+        import_path: Path | str | None = None,
     ):
         self.config_manager = config_manager
         self.workspace_manager = WorkspaceManager(workspace, config_manager)
@@ -197,7 +198,7 @@ class LauncherApp:
             return True
         return False
 
-    def select_path_with_history(self, history_type: str) -> Path | None:
+    def select_path_with_history(self, history_type: str) -> Path | str | None:
         """Pfad-Auswahl mit History oder manuelle Eingabe. Enter = übernehmen, Tab = bearbeiten."""
         if history_type == "export":
             select_title = "Export-Ziel auswählen:"
@@ -240,6 +241,9 @@ class LauncherApp:
         if not path_input or not path_input.strip():
             return None
 
+        if _is_remote_target(path_input):
+            return path_input
+
         return Path(path_input).expanduser()
 
     @staticmethod
@@ -251,17 +255,20 @@ class LauncherApp:
             timestamp = datetime.fromisoformat(entry["timestamp"]).strftime(
                 "%Y-%m-%d %H:%M"
             )
-            path_obj = Path(path)
-            if path_obj.is_file():
-                icon = "📄"
-            elif path_obj.is_dir():
-                icon = "📁"
+            if _is_remote_target(path):
+                icon = "🌐"
             else:
-                icon = "❓"  # Pfad existiert nicht mehr
+                path_obj = Path(path)
+                if path_obj.is_file():
+                    icon = "📄"
+                elif path_obj.is_dir():
+                    icon = "📁"
+                else:
+                    icon = "❓"  # Pfad existiert nicht mehr
             items.append((path, f"{icon} {path} ({timestamp})"))
         return items
 
-    def _get_first_history_path(self, history_type: str) -> Path | None:
+    def _get_first_history_path(self, history_type: str) -> Path | str | None:
         """Pfad des neuesten History-Eintrags dieses Typs, oder None (Alt-Einträge ohne
         type-Feld zählen für beide Typen)."""
         self.config_manager.reload()
@@ -271,7 +278,10 @@ class LauncherApp:
         )
         if entry is None:
             return None
-        return Path(entry["path"]).expanduser()
+        path_str = entry["path"]
+        if _is_remote_target(path_str):
+            return path_str
+        return Path(path_str).expanduser()
 
     def handle_export_first(self) -> None:
         """Export per Hotkey zum ersten Export-Eintrag der History."""
@@ -302,6 +312,11 @@ class LauncherApp:
                 curses_message, "VS Code", "Kein Import-Eintrag in der History"
             )
             return
+        if isinstance(source, str):
+            curses.wrapper(
+                curses_message, "VS Code", "VS Code kann keine Remote-Pfade (SSH) öffnen"
+            )
+            return
         if not source.exists():
             curses.wrapper(curses_message, "VS Code", f"Pfad existiert nicht: {source}")
             return
@@ -330,7 +345,7 @@ class LauncherApp:
             if self.workspace_manager.reset():
                 self.config_manager.record_reset()
 
-    def _confirm_export_target(self, destination: Path) -> bool:
+    def _confirm_export_target(self, destination: Path | str) -> bool:
         """Warnt wenn destination vom letzten Import-Pfad abweicht (Folder-Export hat
         Mirror-Semantik, überträgt also auch Löschungen). True = fortfahren."""
         import_path = self._get_first_history_path("import")
@@ -347,7 +362,13 @@ class LauncherApp:
             mouse_enabled=self._is_mouse_navigation_enabled(),
         )
 
-    def handle_export(self, destination: Path | None = None) -> None:
+    @staticmethod
+    def _remote_target_is_single_file(path_str: str) -> bool:
+        """Dateiendungs-Heuristik für SSH-Remote-Ziele (is_file()/is_dir() sind ohne
+        SSH-Verbindung nicht prüfbar), analog zur lokalen Export-Heuristik."""
+        return PurePosixPath(_remote_path_part(path_str)).suffix != ""
+
+    def handle_export(self, destination: Path | str | None = None) -> None:
         """Export-Operation mit Auto-Detect: Single File oder Folder."""
         self.config_manager.reload()
         if self.workspace_manager.is_empty():
@@ -367,32 +388,42 @@ class LauncherApp:
 
         # Single File: Dateiendung vorhanden ODER Ziel ist bereits eine Datei
         # (Folder Mode: kein Suffix und kein existierender File-Pfad)
-        if destination.suffix != "" or destination.is_file():
+        if isinstance(destination, str):
+            is_single_file = self._remote_target_is_single_file(destination)
+        else:
+            is_single_file = destination.suffix != "" or destination.is_file()
+
+        if is_single_file:
             self._handle_single_file_export(destination)
         else:
             self._handle_folder_export(destination)
 
-    def _handle_folder_export(self, destination: Path) -> None:
-        """Folder-Export: Vorab-Checks/Dialoge hier, eigentlicher Sync in WorkspaceManager."""
-        if not destination.parent.exists():
-            curses.wrapper(
-                curses_message,
-                "Fehler",
-                f"Elternverzeichnis existiert nicht:\n{destination.parent}",
-            )
-            return
+    def _handle_folder_export(self, destination: Path | str) -> None:
+        """Folder-Export: Vorab-Checks/Dialoge hier, eigentlicher Sync in WorkspaceManager.
 
-        if destination.exists() and self.workspace_manager.needs_overwrite_confirmation():
-            confirmed = curses.wrapper(
-                curses_confirm,
-                f"Das Ziel ({destination}) existiert bereits.\n"
-                "Ziel wird synchronisiert – überzählige Dateien im Ziel werden gelöscht!\n"
-                "Fortfahren?",
-                default=False,
-                mouse_enabled=self._is_mouse_navigation_enabled(),
-            )
-            if not confirmed:
+        Bei einem Remote-Ziel (str) entfallen die Vorab-Checks – ohne SSH-Verbindung
+        nicht prüfbar, rsync übernimmt Merge/Overwrite selbst.
+        """
+        if isinstance(destination, Path):
+            if not destination.parent.exists():
+                curses.wrapper(
+                    curses_message,
+                    "Fehler",
+                    f"Elternverzeichnis existiert nicht:\n{destination.parent}",
+                )
                 return
+
+            if destination.exists() and self.workspace_manager.needs_overwrite_confirmation():
+                confirmed = curses.wrapper(
+                    curses_confirm,
+                    f"Das Ziel ({destination}) existiert bereits.\n"
+                    "Ziel wird synchronisiert – überzählige Dateien im Ziel werden gelöscht!\n"
+                    "Fortfahren?",
+                    default=False,
+                    mouse_enabled=self._is_mouse_navigation_enabled(),
+                )
+                if not confirmed:
+                    return
 
         result = self.workspace_manager.export_to(destination)
         if not result.success:
@@ -411,9 +442,13 @@ class LauncherApp:
             if reset_confirmed:
                 self.workspace_manager.reset()
 
-    def _handle_single_file_export(self, destination: Path) -> None:
+    def _handle_single_file_export(self, destination: Path | str) -> None:
         """Exportiert eine einzelne Datei aus Workspace – Dateiname aus Zielpfad."""
-        filename = destination.name
+        filename = (
+            destination.name
+            if isinstance(destination, Path)
+            else PurePosixPath(_remote_path_part(destination)).name
+        )
         matches = [
             item
             for item in self.workspace_manager.workspace.rglob(filename)
@@ -441,7 +476,11 @@ class LauncherApp:
                 f"Verwende: {rel_path}",
             )
 
-        if destination.exists() and self.workspace_manager.needs_overwrite_confirmation():
+        if (
+            isinstance(destination, Path)
+            and destination.exists()
+            and self.workspace_manager.needs_overwrite_confirmation()
+        ):
             overwrite = curses.wrapper(
                 curses_confirm,
                 f"Die Zieldatei ({destination}) existiert bereits.\nÜberschreiben?",
@@ -468,24 +507,37 @@ class LauncherApp:
 
         self.config_manager.add_to_history(destination, "export")
 
-    def handle_import(self, source: Path | None = None) -> None:
-        """Import-Operation mit Auto-Detect: Single File oder Folder."""
+    def handle_import(self, source: Path | str | None = None) -> None:
+        """Import-Operation mit Auto-Detect: Single File oder Folder.
+
+        Bei einem Remote-Ziel (str) sind is_file()/is_dir() ohne SSH-Verbindung
+        nicht prüfbar – Modus-Entscheidung dann über dieselbe Dateiendungs-Heuristik
+        wie beim Export.
+        """
         self.config_manager.reload()
         source = source or self.import_path or self.select_path_with_history("import")
         if source is None:
             return
 
-        if source.is_file():
+        if isinstance(source, str):
+            if self._remote_target_is_single_file(source):
+                self._handle_single_file_import(source)
+            else:
+                self._handle_folder_import(source)
+        elif source.is_file():
             self._handle_single_file_import(source)
         elif source.is_dir():
             self._handle_folder_import(source)
         else:
             curses.wrapper(curses_message, "Fehler", f"Pfad existiert nicht:\n{source}")
 
-    def _handle_single_file_import(self, source: Path) -> None:
+    def _handle_single_file_import(self, source: Path | str) -> None:
         """Single-File-Import: Ignore-Pattern-Warnung hier, eigentliche Kopie in WorkspaceManager."""
+        filename = (
+            source.name if isinstance(source, Path) else PurePosixPath(_remote_path_part(source)).name
+        )
         matched_pattern = self.workspace_manager.matched_ignore_pattern(
-            source.name, "import_ignore_patterns"
+            filename, "import_ignore_patterns"
         )
         if matched_pattern:
             curses.wrapper(
@@ -502,7 +554,7 @@ class LauncherApp:
         self.config_manager.add_to_history(source, "import")
         self.config_manager.add_to_history(source, "export", synthetic=True)
 
-    def _handle_folder_import(self, source: Path) -> None:
+    def _handle_folder_import(self, source: Path | str) -> None:
         """Folder-Import: Lösch-Bestätigung hier, eigentlicher Sync in WorkspaceManager."""
         if not self.workspace_manager.is_empty():
             confirmed = curses.wrapper(

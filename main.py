@@ -11,7 +11,15 @@ from pathlib import Path
 
 from claude_code_launcher.config_manager import ConfigManager
 from claude_code_launcher.launcher_app import LauncherApp
+from claude_code_launcher.remote_target import _is_remote_target
 from claude_code_launcher.system_helpers import _load_login_shell_path
+
+
+def _cli_target(raw: str | None) -> Path | str | None:
+    """CLI-Pfad-Arg in Path (lokal) oder rohen String (SSH-Remote-Ziel) umwandeln."""
+    if raw is None:
+        return None
+    return raw if _is_remote_target(raw) else Path(raw).absolute()
 
 
 def main() -> None:
@@ -29,6 +37,7 @@ Beispiele:
   %(prog)s /path/to/.claude                     # Verwendet angegebenes Workspace
   %(prog)s /path/to/.claude --export /backup    # Exportiert direkt zu angegebenem Pfad
   %(prog)s /path/to/.claude --import /backup    # Importiert direkt von angegebenem Pfad
+  %(prog)s /path/to/.claude --export user@host:/backup  # Export zu SSH-Remote-Ziel (rsync)
   %(prog)s /path/to/.claude --config custom.toml # Verwendet eigene Config-Datei
         """,
     )
@@ -91,8 +100,8 @@ Beispiele:
             print("Abgebrochen. Workspace wurde nicht erstellt.")
             sys.exit(0)
 
-    export_path = Path(args.export_path).absolute() if args.export_path else None
-    import_path = Path(args.import_path).absolute() if args.import_path else None
+    export_path = _cli_target(args.export_path)
+    import_path = _cli_target(args.import_path)
 
     app = LauncherApp(
         workspace,

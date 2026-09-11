@@ -75,9 +75,12 @@ class ConfigManager:
             f.write(_dump_toml(config))
 
     def add_to_history(
-        self, path: Path, history_type: str, synthetic: bool = False
+        self, path: Path | str, history_type: str, synthetic: bool = False
     ) -> None:
         """Fügt path zur History hinzu, limitiert auf max_history_entries.
+
+        path als str bedeutet ein SSH-Remote-Ziel (z. B. "user@host:/pfad") und wird
+        unverändert gespeichert statt via .absolute() als lokaler Pfad behandelt.
 
         synthetic=True markiert automatisch (nicht vom Nutzer ausgelöst) angelegte
         Einträge, z. B. den Export-Eintrag, den ein Import zum selben Pfad anlegt,
@@ -89,7 +92,7 @@ class ConfigManager:
 
         self.reload()
         history = self.config["history"]
-        path_str = str(path.absolute())
+        path_str = str(path) if isinstance(path, str) else str(path.absolute())
 
         # Duplikate pro (Pfad, Typ) entfernen, dann neuen Eintrag vorne einfügen;
         # Alt-Einträge ohne type-Feld gelten als Treffer und werden ersetzt

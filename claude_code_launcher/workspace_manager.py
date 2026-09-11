@@ -10,10 +10,18 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
-from .constants import BYTES_PER_KB, BYTES_PER_MB, RSYNC_BASE_ARGS, RSYNC_BINARY, RSYNC_DELETE_EXCLUDED_ARG
+from .constants import (
+    BYTES_PER_KB,
+    BYTES_PER_MB,
+    RSYNC_BASE_ARGS,
+    RSYNC_BINARY,
+    RSYNC_DELETE_EXCLUDED_ARG,
+    RSYNC_FILE_COPY_ARGS,
+)
+from .remote_target import _remote_path_part
 
 if TYPE_CHECKING:
     from .config_manager import ConfigManager
@@ -163,23 +171,13 @@ class WorkspaceManager:
             for pattern in self._get_ignore_patterns(pattern_key)
         ]
 
-    def _rsync_mirror(
-        self,
-        source: Path,
-        destination: Path,
-        pattern_key: str,
-        delete_excluded: bool,
-    ) -> None:
-        """Spiegelt source nach destination via rsync (überträgt auch Löschungen).
+    @staticmethod
+    def _run_rsync(cmd: list[str]) -> None:
+        """Führt einen rsync-Befehl aus.
 
         Raises:
-            OSError: Wenn rsync fehlt oder mit Fehler endet.
+            OSError: Wenn rsync fehlt oder mit Fehler endet (z. B. SSH nicht erreichbar).
         """
-        cmd = [RSYNC_BINARY, *RSYNC_BASE_ARGS]
-        if delete_excluded:
-            cmd.append(RSYNC_DELETE_EXCLUDED_ARG)
-        cmd.extend(self._get_exclude_args(pattern_key))
-        cmd.extend([f"{source}/", str(destination)])
         try:
             result = subprocess.run(cmd, capture_output=True, text=True)
         except FileNotFoundError as e:
@@ -187,6 +185,25 @@ class WorkspaceManager:
         if result.returncode != 0:
             stderr = result.stderr.strip() or "unbekannter Fehler"
             raise OSError(f"rsync fehlgeschlagen (Exit {result.returncode}): {stderr}")
+
+    def _rsync_mirror(
+        self,
+        source: Path | str,
+        destination: Path | str,
+        pattern_key: str,
+        delete_excluded: bool,
+    ) -> None:
+        """Spiegelt source nach destination via rsync (überträgt auch Löschungen)."""
+        cmd = [RSYNC_BINARY, *RSYNC_BASE_ARGS]
+        if delete_excluded:
+            cmd.append(RSYNC_DELETE_EXCLUDED_ARG)
+        cmd.extend(self._get_exclude_args(pattern_key))
+        cmd.extend([f"{source}/", str(destination)])
+        self._run_rsync(cmd)
+
+    def _rsync_copy_file(self, source: Path | str, destination: Path | str) -> None:
+        """Kopiert eine einzelne Datei via rsync (lokal wie remote) statt shutil.copy2."""
+        self._run_rsync([RSYNC_BINARY, *RSYNC_FILE_COPY_ARGS, str(source), str(destination)])
 
     @staticmethod
     def _is_file_ignored(filename: str, patterns: list[str]) -> str | None:
@@ -222,14 +239,15 @@ class WorkspaceManager:
             print(f"✗ Fehler beim Reset: {e}")
             return False
 
-    def export_to(self, destination: Path) -> OperationResult:
+    def export_to(self, destination: Path | str) -> OperationResult:
         """Exportiert Workspace zu destination (Folder Mode, rsync-Mirror).
 
+        destination als str bedeutet ein SSH-Remote-Ziel (z. B. "user@host:/pfad") und
+        wird unverändert an rsync durchgereicht statt als lokaler Path interpretiert.
         Existenz-/Überschreib-Checks und die Reset-Nachfrage danach sind Sache des
         Aufrufers (LauncherApp) – diese Methode führt nur den Sync aus.
         """
         try:
-            destination = Path(destination)
             self._rsync_mirror(
                 self.workspace, destination, "export_ignore_patterns", delete_excluded=False
             )
@@ -242,8 +260,8 @@ class WorkspaceManager:
             print(f"✗ Fehler beim Export: {e}")
             return OperationResult(success=False, error=str(e))
 
-    def export_file_to(self, rel_file_path: str, destination: Path) -> OperationResult:
-        """Exportiert eine einzelne Datei aus Workspace nach destination.
+    def export_file_to(self, rel_file_path: str, destination: Path | str) -> OperationResult:
+        """Exportiert eine einzelne Datei aus Workspace nach destination (lokal oder SSH-Remote).
 
         Ignore-Pattern-Warnung ist Sache des Aufrufers (matched_ignore_pattern()).
         """
@@ -253,41 +271,48 @@ class WorkspaceManager:
             return OperationResult(False, f"Datei nicht gefunden:\n{source_file}")
 
         try:
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_file, destination)
+            if isinstance(destination, Path):
+                destination.parent.mkdir(parents=True, exist_ok=True)
+            self._rsync_copy_file(source_file, destination)
             return OperationResult(success=True)
         except PermissionError as e:
             return OperationResult(False, f"Keine Berechtigung:\n{e}")
         except OSError as e:
             return OperationResult(False, f"Fehler beim Export:\n{e}")
 
-    def import_file_from(self, source_file: Path) -> OperationResult:
-        """Importiert eine einzelne Datei nach Workspace-Root.
+    def import_file_from(self, source_file: Path | str) -> OperationResult:
+        """Importiert eine einzelne Datei nach Workspace-Root (lokal oder SSH-Remote).
 
-        Der Not-Found-Guard greift nur bei direktem Aufruf ohne den is_file()-Zweig
-        von LauncherApp.handle_import() (der ihn bereits ausschließt) – hier belassen
-        für Robustheit bei künftigen Direktaufrufen/Tests.
+        Der Not-Found-Guard greift nur bei lokaler source_file – ein Remote-Pfad kann
+        ohne SSH-Verbindung nicht vorab geprüft werden, ein nicht erreichbares Ziel
+        schlägt stattdessen als OSError beim rsync-Aufruf fehl.
         """
-        if not source_file.exists():
+        if isinstance(source_file, Path) and not source_file.exists():
             return OperationResult(False, f"Quelldatei nicht gefunden:\n{source_file}")
 
+        filename = (
+            source_file.name
+            if isinstance(source_file, Path)
+            else PurePosixPath(_remote_path_part(source_file)).name
+        )
         try:
-            destination = self.workspace / source_file.name
-            shutil.copy2(source_file, destination)
+            destination = self.workspace / filename
+            self._rsync_copy_file(source_file, destination)
             return OperationResult(success=True)
         except PermissionError as e:
             return OperationResult(False, f"Keine Berechtigung:\n{e}")
         except OSError as e:
             return OperationResult(False, f"Fehler beim Import:\n{e}")
 
-    def import_from(self, source: Path) -> OperationResult:
+    def import_from(self, source: Path | str) -> OperationResult:
         """Importiert Workspace von source (Folder Mode, rsync-Mirror inkl. Löschungen).
 
-        Existenz-/Verzeichnis-Checks und die "Workspace nicht leer"-Bestätigung sind
-        Sache des Aufrufers (LauncherApp) – diese Methode führt nur den Sync aus.
+        source als str bedeutet ein SSH-Remote-Ziel und wird unverändert an rsync
+        durchgereicht. Existenz-/Verzeichnis-Checks und die "Workspace nicht leer"-
+        Bestätigung sind Sache des Aufrufers (LauncherApp) – diese Methode führt nur
+        den Sync aus.
         """
         try:
-            source = Path(source)
             self._rsync_mirror(
                 source, self.workspace, "import_ignore_patterns", delete_excluded=True
             )

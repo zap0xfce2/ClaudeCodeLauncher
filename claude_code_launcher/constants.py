@@ -77,10 +77,11 @@ ACTION_TO_SHORTCUT: dict[str, str] = {
 BYTES_PER_KB = 1024
 BYTES_PER_MB = 1024 * 1024
 
-# --- rsync (Folder-Mode Export/Import) ---
+# --- rsync (Folder-Mode + Single-File Export/Import, lokal wie remote) ---
 RSYNC_BINARY = "rsync"
 RSYNC_BASE_ARGS = ["-a", "--delete"]
 RSYNC_DELETE_EXCLUDED_ARG = "--delete-excluded"
+RSYNC_FILE_COPY_ARGS = ["-a"]  # Single-File-Kopie, kein --delete nötig
 
 # --- VS Code CLI (Importquelle öffnen) ---
 VSCODE_BINARY = "code"

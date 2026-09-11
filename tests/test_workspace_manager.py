@@ -226,6 +226,41 @@ def test_import_file_from_returns_failure_when_source_missing(tmp_path):
     assert result.success is False
 
 
+def test_export_file_to_skips_parent_mkdir_for_remote_destination_string(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "CLAUDE.md").write_text("content")
+    manager = WorkspaceManager(workspace)
+    recorded = {}
+    monkeypatch.setattr(
+        manager,
+        "_rsync_copy_file",
+        lambda source, destination: recorded.update(destination=destination),
+    )
+
+    result = manager.export_file_to("CLAUDE.md", "user@host:/remote/out.md")
+
+    assert result == OperationResult(success=True)
+    assert recorded["destination"] == "user@host:/remote/out.md"
+
+
+def test_import_file_from_derives_filename_from_remote_source_path(tmp_path, monkeypatch):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    manager = WorkspaceManager(workspace)
+    recorded = {}
+    monkeypatch.setattr(
+        manager,
+        "_rsync_copy_file",
+        lambda source, destination: recorded.update(destination=destination),
+    )
+
+    result = manager.import_file_from("user@host:/remote/dir/CLAUDE.md")
+
+    assert result == OperationResult(success=True)
+    assert recorded["destination"] == workspace / "CLAUDE.md"
+
+
 def test_import_from_mirrors_source_into_workspace_and_deletes_excluded(tmp_path):
     source = tmp_path / "source"
     source.mkdir()

@@ -8,6 +8,8 @@ dont_ask_on_export_overwrite = false
 plan_idle_timer_enabled = true
 plan_idle_timer_duration = 10
 mouse_navigation_enabled = true
+prompt_manager_binary = "/path/to/qDrover"
+prompt_manager_args = "--help"
 
 [[history]]
 path = "/your/path/ClaudeCodeLauncher"

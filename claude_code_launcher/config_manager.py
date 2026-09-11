@@ -40,6 +40,8 @@ class ConfigManager:
             "mouse_navigation_enabled": True,
             "recent_shortcuts": [],
             "usage_cache": {},
+            "prompt_manager_binary": "qDrover",
+            "prompt_manager_args": [],
         }
 
         if not self.config_path.exists():

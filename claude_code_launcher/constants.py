@@ -89,9 +89,6 @@ VSCODE_BINARY = "code"
 # --- macOS Theme-Erkennung (launch_claude) ---
 DEFAULTS_BINARY = "defaults"
 
-# --- proqi CLI (Prompt-Sessions durchsuchen, handle_prompt_sessions) ---
-PROQI_BINARY = "proqi"
-
 # --- Terminal leeren vor Claude-Start (launch_claude) ---
 CLEAR_BINARY = "/usr/bin/clear"
 

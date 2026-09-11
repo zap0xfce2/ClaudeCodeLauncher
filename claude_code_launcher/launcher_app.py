@@ -14,7 +14,6 @@ from .constants import (
     CLEAR_BINARY,
     DEFAULT_SHELL,
     DEFAULTS_BINARY,
-    PROQI_BINARY,
     SHORTCUT_LABELS,
     VSCODE_BINARY,
 )
@@ -644,16 +643,16 @@ class LauncherApp:
         )
 
     def handle_prompt_sessions(self) -> None:
-        """Öffnet proqis Session-Browser (-r) im Workspace-Verzeichnis."""
+        """Öffnet den konfigurierten Prompt-Manager im Workspace-Verzeichnis."""
+        binary = self.config_manager.config.get("prompt_manager_binary", "qDrover")
+        args = self.config_manager.config.get("prompt_manager_args", [])
         try:
-            subprocess.run(
-                [PROQI_BINARY, "-r"], cwd=str(self.workspace_manager.workspace)
-            )
+            subprocess.run([binary, *args], cwd=str(self.workspace_manager.workspace))
         except FileNotFoundError:
             curses.wrapper(
                 curses_message,
-                "proqi",
-                "proqi-Kommando nicht gefunden – https://github.com/oborchers/proqi installieren",
+                "Prompt-Manager",
+                f"„{binary}“-Kommando nicht gefunden – prompt_manager_binary in config.toml prüfen",
             )
 
     def handle_shell(self) -> None:

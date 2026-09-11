@@ -21,7 +21,7 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 - **Maus-Navigation** – Hover wechselt die Auswahl, Klick bestätigt (Hauptmenü, Ja/Nein-Dialoge, Listen-Auswahl, Workspace-Inhalt anzeigen); per `config.toml` ab-/anschaltbar
 - **Workspace-Übersicht** – Mehrspaltige, nach letzter Änderung sortierte Dateiliste für schnelle Projekterkennung in breiten Terminal-Fenstern; Punkt-Ordner (z. B. `.git`) erscheinen als ein Eintrag mit rekursiv berechneter Gesamtgröße statt mit ihrem vollständigen Inhalt; 📁/📄-Symbole unterscheiden Ordner- und Datei-Einträge; `Enter`/Maus-Klick kopiert den Dateinamen des markierten Eintrags in die Zwischenablage
 - **Shell-Zugang** – Terminal im Workspace-Verzeichnis öffnen
-- **Prompts verwalten** – [proqi](https://github.com/oborchers/proqi)s Session-Browser (`proqi -r`) im Workspace-Verzeichnis öffnen
+- **Prompts verwalten** – konfigurierbarer Prompt-Manager (`prompt_manager_binary`/`prompt_manager_args` in `config.toml`, Default `qDrover`) im Workspace-Verzeichnis öffnen
 - **macOS-Theme-Sync** – Claude-Theme wird automatisch mit Dark/Light Mode synchronisiert
 - **Claude-Nutzungsstatistik** – Session-/Weekly-Auslastung samt "Aktualisiert"-Zeitstempel via `openusage`-CLI (falls installiert); wird in `config.toml` zwischengespeichert, sodass sie auch bei einer fehlgeschlagenen Neu-Abfrage sichtbar bleibt
 
@@ -30,7 +30,7 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 - Python 3.11+
 - `rsync` (für Export/Import, Folder- wie Single-File-Modus, auch für SSH-Remote-Ziele; auf macOS vorinstalliert)
 - `code`-CLI von VS Code (optional, nur für „Importquelle in VS Code öffnen")
-- [proqi](https://github.com/oborchers/proqi)-CLI (optional, nur für „Prompts verwalten")
+- Prompt-Manager-CLI (optional, nur für „Prompts verwalten"; Name/Argumente über `prompt_manager_binary`/`prompt_manager_args` in `config.toml` konfigurierbar, Default `qDrover`)
 - [Task](https://taskfile.dev) (nur für den Build)
 - [uv](https://docs.astral.sh/uv/) (Dependency-Management; installiert auch [Nuitka](https://nuitka.net) für den Build)
 
@@ -120,6 +120,8 @@ Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann
 | `mouse_navigation_enabled`     | bool   | `true`   | Maus-Hover/Klick in Hauptmenü, Ja/Nein-Dialogen, Listen-Auswahl und Workspace-Inhalt anzeigen                                           |
 | `recent_shortcuts`             | Liste  | `[]`     | Zuletzt verwendete Hotkey-Buchstaben (neuestes zuerst, max. 4), bestimmt den dynamischen Footer-Ausschnitt. Automatisch gepflegt        |
 | `usage_cache`                  | Dict   | `{}`     | Zwischengespeicherte Claude-Nutzungsstatistik der letzten erfolgreichen `openusage`-Abfrage. Automatisch gepflegt, nicht manuell ändern |
+| `prompt_manager_binary`        | string | `"qDrover"` | Binary-Name/Pfad für den Prompt-Manager (Menüpunkt „Prompts verwalten", Hotkey `p`)                                                  |
+| `prompt_manager_args`          | Liste  | `[]`     | Zusätzliche Argumente für den Prompt-Manager-Aufruf                                                                                     |
 | `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern)                                                              |
 
 `claude_instruction` wird manuell in `config.toml` gepflegt; eine Änderung wirkt nach Drücken von `r` (Refresh) im Hauptmenü, ohne den Launcher neu zu starten. `r` fragt außerdem immer sofort die aktuelle Claude-Nutzungsstatistik neu ab (statt bis zu 5 Minuten alte gecachte Werte zu zeigen).
@@ -145,7 +147,7 @@ ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
 | `r`                 | Status aktualisieren                                                                                          |
 | `s`                 | Sitzung starten                                                                                               |
 | `t`                 | Shell direkt öffnen                                                                                           |
-| `p`                 | Prompts verwalten (proqi Session-Browser, `proqi -r` im Workspace-Verzeichnis)                                |
+| `p`                 | Prompts verwalten (konfigurierbarer Prompt-Manager, siehe `prompt_manager_binary`/`prompt_manager_args`)      |
 | `e`                 | Export zum ersten Export-History-Eintrag (wie jeder Export: warnt, wenn der Pfad vom letzten Import abweicht) |
 | `i`                 | Import vom ersten Import-History-Eintrag (mit bestehender Lösch-Rückfrage)                                    |
 | `v`                 | Importquelle in VS Code öffnen                                                                                |

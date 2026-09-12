@@ -38,7 +38,8 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 
 Entwickelt und primär getestet auf macOS. Läuft grundsätzlich auch auf einer headless Alpine-Linux-VM (SSH/Terminal, kein X11/Wayland), mit folgenden Einschränkungen und Voraussetzungen:
 
-- **Zusätzliche Systempakete** (`apk add`): `ncurses ncurses-terminfo` (curses-Runtime + `clear`-Binary), `gcc musl-dev patchelf` (nur für den Nuitka-Onefile-Build), `rsync` (Export/Import)
+- **Zusätzliche Systempakete** (`apk add`): `ncurses ncurses-terminfo` (curses-Runtime + `clear`-Binary), `gcc musl-dev` (nur für den Nuitka-Onefile-Build), `rsync` (Export/Import)
+- **`patchelf`**: bewusst **kein** Systempaket – Alpines `apk`-Paket ist auf Version `0.18.0` fixiert, die Nuitka als bekannt fehlerhaft hart blockt (`FATAL: Error, patchelf version 0.18.0 is a known buggy release`). Kommt stattdessen automatisch über `uv sync` aus der `dev`-Dependency-Group in `pyproject.toml` (PyPI-Wheel, aktuelle Version)
 - **Clipboard**: Kopiert Dateinamen (`Enter`/Klick in „Inhalt anzeigen") auf Nicht-macOS-Systemen per [OSC 52](https://sunaku.github.io/tmux-yank-osc52.html) statt `pbcopy` – das jeweilige Terminal-Programm (z. B. iTerm2, kitty, WezTerm, Windows Terminal, foot, alacritty) muss das unterstützen und fängt die Sequenz über SSH ab, ganz ohne Display-Server. Unterstützt das Terminal es nicht, passiert einfach nichts (kein Fehler sichtbar)
 - **macOS-Theme-Sync**: inaktiv auf Nicht-macOS-Systemen (keine `defaults`-CLI, kein Äquivalent für headless Linux)
 - **Login-Shell-PATH-Probe** (`_load_login_shell_path`): liest `$SHELL` dynamisch, nicht auf zsh hartcodiert – getestet mit zsh + oh-my-zsh; mit einer minimalistischen Shell wie BusyBox `ash` ungetestet

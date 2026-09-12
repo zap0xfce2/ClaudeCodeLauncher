@@ -4,6 +4,7 @@ import curses
 import json
 import os
 import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -607,6 +608,8 @@ class LauncherApp:
 
     def _apply_macos_theme(self) -> None:
         """Setzt Claude-Theme (~/.claude.json) basierend auf macOS Dark/Light Mode."""
+        if sys.platform != "darwin":
+            return
         result = subprocess.run(
             [DEFAULTS_BINARY, "read", "-g", "AppleInterfaceStyle"],
             capture_output=True,

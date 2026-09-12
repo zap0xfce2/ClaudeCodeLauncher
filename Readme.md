@@ -34,6 +34,15 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 - [Task](https://taskfile.dev) (nur für den Build)
 - [uv](https://docs.astral.sh/uv/) (Dependency-Management; installiert auch [Nuitka](https://nuitka.net) für den Build)
 
+## Linux/Alpine-Betrieb
+
+Entwickelt und primär getestet auf macOS. Läuft grundsätzlich auch auf einer headless Alpine-Linux-VM (SSH/Terminal, kein X11/Wayland), mit folgenden Einschränkungen und Voraussetzungen:
+
+- **Zusätzliche Systempakete** (`apk add`): `ncurses ncurses-terminfo` (curses-Runtime + `clear`-Binary), `gcc musl-dev patchelf` (nur für den Nuitka-Onefile-Build), `rsync` (Export/Import)
+- **Clipboard**: Kopiert Dateinamen (`Enter`/Klick in „Inhalt anzeigen") auf Nicht-macOS-Systemen per [OSC 52](https://sunaku.github.io/tmux-yank-osc52.html) statt `pbcopy` – das jeweilige Terminal-Programm (z. B. iTerm2, kitty, WezTerm, Windows Terminal, foot, alacritty) muss das unterstützen und fängt die Sequenz über SSH ab, ganz ohne Display-Server. Unterstützt das Terminal es nicht, passiert einfach nichts (kein Fehler sichtbar)
+- **macOS-Theme-Sync**: inaktiv auf Nicht-macOS-Systemen (keine `defaults`-CLI, kein Äquivalent für headless Linux)
+- **Login-Shell-PATH-Probe** (`_load_login_shell_path`): liest `$SHELL` dynamisch, nicht auf zsh hartcodiert – getestet mit zsh + oh-my-zsh; mit einer minimalistischen Shell wie BusyBox `ash` ungetestet
+
 ## Installation & Setup
 
 ```bash

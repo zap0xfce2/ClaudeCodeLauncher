@@ -112,6 +112,10 @@ MINUTES_PER_DAY = 1440
 # --- Zwischenablage (Browse: Dateiname kopieren) ---
 CLIPBOARD_BINARY = "pbcopy"
 CLIPBOARD_COPY_TIMEOUT = 2
+# OSC-52-Escape-Sequenz als pbcopy-Ersatz auf Nicht-macOS (Linux/headless): das
+# Terminal-Programm des Users fängt sie ab und schreibt in dessen lokale
+# Zwischenablage – funktioniert über SSH ganz ohne Display-Server (X11/Wayland).
+OSC52_CLIPBOARD_TEMPLATE = "\x1b]52;c;{}\x07"
 
 # --- Einrückung für Listen-Einträge (UI_PADDING_X + "> " Präfix) ---
 ITEM_INDENT_X = UI_PADDING_X + 2  # = 4

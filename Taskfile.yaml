@@ -30,7 +30,7 @@ tasks:
       - mkdir -p {{.BUILD_DIR}}
       - cp main.py {{.BUILD_DIR}}/main.py
       - cp -R claude_code_launcher {{.BUILD_DIR}}/claude_code_launcher
-      - sed -i '' 's/VERSION = "vYYMMDDhhmm"/VERSION = "v{{.BUILD_DATE}}"/' {{.BUILD_DIR}}/main.py
+      - sed 's/VERSION = "vYYMMDDhhmm"/VERSION = "v{{.BUILD_DATE}}"/' {{.BUILD_DIR}}/main.py > {{.BUILD_DIR}}/main.py.tmp && mv {{.BUILD_DIR}}/main.py.tmp {{.BUILD_DIR}}/main.py
       - uv run python -m nuitka --mode=onefile --output-dir={{.BUILD_DIR}} --output-filename=ClaudeCodeLauncher --assume-yes-for-downloads --quiet {{.BUILD_DIR}}/main.py
 
   install:

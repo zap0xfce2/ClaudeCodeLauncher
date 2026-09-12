@@ -46,7 +46,7 @@ uv sync
 task build
 ```
 
-Erstellt via Nuitka eine eigenständige Binary unter `/opt/homebrew/bin/ClaudeCodeLauncher`.
+Erstellt via Nuitka eine eigenständige Binary unter `~/bin/ClaudeCodeLauncher`.
 
 ## Verwendung
 

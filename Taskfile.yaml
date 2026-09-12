@@ -18,7 +18,7 @@ tasks:
     desc: "Bereinige vorherige Builds"
     cmds:
       - rm -rf build dist __pycache__ {{.BUILD_DIR}}
-      - rm -rf /opt/homebrew/bin/ClaudeCodeLauncher
+      - rm -rf ~/bin/ClaudeCodeLauncher
 
   build:
     desc: "Erstelle die Anwendung mit gesetzter Version"
@@ -31,12 +31,13 @@ tasks:
       - cp main.py {{.BUILD_DIR}}/main.py
       - cp -R claude_code_launcher {{.BUILD_DIR}}/claude_code_launcher
       - sed -i '' 's/VERSION = "vYYMMDDhhmm"/VERSION = "v{{.BUILD_DATE}}"/' {{.BUILD_DIR}}/main.py
-      - uv run python -m nuitka --mode=onefile --output-dir={{.BUILD_DIR}} --output-filename=ClaudeCodeLauncher --remove-output --assume-yes-for-downloads --quiet {{.BUILD_DIR}}/main.py
+      - uv run python -m nuitka --mode=onefile --output-dir={{.BUILD_DIR}} --output-filename=ClaudeCodeLauncher --assume-yes-for-downloads --quiet {{.BUILD_DIR}}/main.py
 
   install:
     desc: "Installiere das Build"
     cmds:
-      - cp {{.BUILD_DIR}}/ClaudeCodeLauncher /opt/homebrew/bin
+      - mkdir -p ~/bin
+      - cp {{.BUILD_DIR}}/ClaudeCodeLauncher ~/bin/
 
   post-clean:
     desc: "Entfernt temporäres Build-Verzeichnis"

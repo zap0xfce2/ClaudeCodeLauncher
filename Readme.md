@@ -14,7 +14,7 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 - **SSH-Remote-Ziele** – Export/Import unterstützen neben lokalen Pfaden auch rsync-Remote-Ziele im SSH-Style (`user@host:/pfad` oder `host:/pfad`), sowohl im Folder- als auch im Single-File-Modus
 - **History** – Zuletzt verwendete Pfade werden gespeichert und vorgeschlagen; ein Import legt automatisch einen Export-Eintrag zum selben Pfad an, damit Quick-Export (`e`) direkt danach ohne Pfadauswahl funktioniert
 - **VS-Code-Sprung** – Importquelle (letzter Import-Pfad) direkt in VS Code öffnen
-- **Ignore-Patterns** – Konfigurierbare Filter für Export und Import (z. B. `.git`, `.env`)
+- **Ignore-Patterns** – Konfigurierbare Filter für Export und Import (z. B. `.git`, `.env`); optional wird zusätzlich eine `.gitignore` in Quelle/Ziel automatisch respektiert (`respect_gitignore`)
 - **Config-Hotkeys** – Optionen direkt im Hauptmenü togglen
 - **Shortcut-Cheatsheet** – Taste `h` zeigt eine Vollbild-Übersicht aller Shortcuts, schließt sich bei jedem beliebigen Tastendruck wieder
 - **Dynamischer Footer** – zeigt neben `[h]`/`[q]` die vier zuletzt verwendeten Shortcuts, sitzungsübergreifend in `config.toml` gemerkt
@@ -123,6 +123,7 @@ Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann
 | `ignore_patterns`              | Liste  | `[]`     | Dateimuster, die in allen Kontexten gelten – Export, Import und die Leer-Prüfung (steuert ob `Reset`/`Exportieren`/`Inhalt anzeigen` im Menü erscheinen). Wird mit `export_ignore_patterns`/`import_ignore_patterns` kombiniert |
 | `export_ignore_patterns`       | Liste  | `[]`     | Zusätzliche Dateimuster nur für den Export; passende Einträge im Exportziel (z. B. dessen `.git`/`.env`) bleiben unangetastet           |
 | `import_ignore_patterns`       | Liste  | `[]`     | Zusätzliche Dateimuster nur für den Import                                                                                              |
+| `respect_gitignore`            | bool   | `false`  | Respektiert zusätzlich die `.gitignore` der Quelle (Import) bzw. des lokalen Ziels (Export); SSH-Remote-Exportziele werden dabei nicht geschützt |
 | `claude_env`                   | Dict   | `{}`     | Umgebungsvariablen für Claude beim Start (z. B. `{ANTHROPIC_MODEL: "claude-opus-4-6"}`)                                                 |
 | `claude_instruction`           | string | `""`     | Anweisung, die beim Start automatisch als erster Prompt an Claude übergeben wird (leer = keine)                                         |
 | `ask_for_reset`                | bool   | `true`   | Nach Folder-Export: Fragen ob Workspace zurückgesetzt werden soll                                                                       |
@@ -130,7 +131,7 @@ Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann
 | `mouse_navigation_enabled`     | bool   | `true`   | Maus-Hover/Klick in Hauptmenü, Ja/Nein-Dialogen, Listen-Auswahl und Workspace-Inhalt anzeigen                                           |
 | `recent_shortcuts`             | Liste  | `[]`     | Zuletzt verwendete Hotkey-Buchstaben (neuestes zuerst, max. 4), bestimmt den dynamischen Footer-Ausschnitt. Automatisch gepflegt        |
 | `usage_cache`                  | Dict   | `{}`     | Zwischengespeicherte Claude-Nutzungsstatistik der letzten erfolgreichen `openusage`-Abfrage. Automatisch gepflegt, nicht manuell ändern |
-| `prompt_manager_binary`        | string | `"qDrover"` | Binary-Name/Pfad für den Prompt-Manager (Menüpunkt „Prompts verwalten", Hotkey `p`)                                                  |
+| `prompt_manager_binary`        | string | `"qDrover"` | Binary-Name/Pfad für den Prompt-Manager (Menüpunkt „Prompts verwalten", Hotkey `p`); `~` im Pfad wird aufgelöst                     |
 | `prompt_manager_args`          | Liste  | `[]`     | Zusätzliche Argumente für den Prompt-Manager-Aufruf                                                                                     |
 | `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern)                                                              |
 

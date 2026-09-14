@@ -20,6 +20,8 @@ from .constants import (
     RSYNC_BINARY,
     RSYNC_DELETE_EXCLUDED_ARG,
     RSYNC_FILE_COPY_ARGS,
+    RSYNC_GITIGNORE_FILENAME,
+    RSYNC_GITIGNORE_IMPORT_FILTER_ARG,
 )
 from .remote_target import _remote_path_part
 
@@ -192,11 +194,13 @@ class WorkspaceManager:
         destination: Path | str,
         pattern_key: str,
         delete_excluded: bool,
+        extra_filter_args: list[str] = (),
     ) -> None:
         """Spiegelt source nach destination via rsync (überträgt auch Löschungen)."""
         cmd = [RSYNC_BINARY, *RSYNC_BASE_ARGS]
         if delete_excluded:
             cmd.append(RSYNC_DELETE_EXCLUDED_ARG)
+        cmd.extend(extra_filter_args)
         cmd.extend(self._get_exclude_args(pattern_key))
         cmd.extend([f"{source}/", str(destination)])
         self._run_rsync(cmd)
@@ -221,6 +225,30 @@ class WorkspaceManager:
             else False
         )
         return not dont_ask
+
+    def _respects_gitignore(self) -> bool:
+        """True wenn .gitignore in Quelle/Ziel respektiert werden soll (respect_gitignore, Default False)."""
+        return (
+            self.config_manager.config.get("respect_gitignore", False)
+            if self.config_manager
+            else False
+        )
+
+    def _import_gitignore_filter_args(self) -> list[str]:
+        """dir-merge liest .gitignore sender-seitig (Quelle) pro Verzeichnis, rekursiv, tolerant
+        gegenüber Fehlen – daher ohne Vorab-Check immer anhängbar."""
+        return [RSYNC_GITIGNORE_IMPORT_FILTER_ARG] if self._respects_gitignore() else []
+
+    def _export_gitignore_filter_args(self, destination: Path | str) -> list[str]:
+        """merge liest EINMALIG die .gitignore im Wurzelverzeichnis von destination lokal ein –
+        nur für lokale Path-Ziele möglich (SSH-Remote-Export-Ziele bleiben ungeschützt, ohne
+        zusätzlichen SSH-Roundtrip nicht lokal lesbar). Anders als dir-merge bricht merge bei
+        fehlender Datei mit Exit 1 ab, daher Existenz-Check.
+        """
+        if not self._respects_gitignore() or not isinstance(destination, Path):
+            return []
+        gitignore = destination / RSYNC_GITIGNORE_FILENAME
+        return [f"--filter=merge,- {gitignore}"] if gitignore.is_file() else []
 
     def matched_ignore_pattern(self, filename: str, pattern_key: str) -> str | None:
         """Erstes zutreffendes Ignore-Pattern für filename unter pattern_key, oder None."""
@@ -249,7 +277,11 @@ class WorkspaceManager:
         """
         try:
             self._rsync_mirror(
-                self.workspace, destination, "export_ignore_patterns", delete_excluded=False
+                self.workspace,
+                destination,
+                "export_ignore_patterns",
+                delete_excluded=False,
+                extra_filter_args=self._export_gitignore_filter_args(destination),
             )
             print(f"✓ Erfolgreich exportiert nach: {destination}")
             return OperationResult(success=True)
@@ -314,7 +346,11 @@ class WorkspaceManager:
         """
         try:
             self._rsync_mirror(
-                source, self.workspace, "import_ignore_patterns", delete_excluded=True
+                source,
+                self.workspace,
+                "import_ignore_patterns",
+                delete_excluded=True,
+                extra_filter_args=self._import_gitignore_filter_args(),
             )
             print(f"✓ Erfolgreich importiert von: {source}")
             return OperationResult(success=True)

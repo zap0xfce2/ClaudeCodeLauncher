@@ -275,3 +275,125 @@ def test_import_from_mirrors_source_into_workspace_and_deletes_excluded(tmp_path
     assert result == OperationResult(success=True)
     assert (workspace / "CLAUDE.md").read_text() == "new content"
     assert not (workspace / "stale.txt").exists()
+
+
+# --- respect_gitignore ---
+
+
+def test_import_from_respects_gitignore_in_source_excludes_listed_file(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / ".gitignore").write_text(".env\n")
+    (source / ".env").write_text("secret")
+    (source / "CLAUDE.md").write_text("content")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    config_manager = ConfigManager(tmp_path / "config.toml")
+    config_manager.config["respect_gitignore"] = True
+    manager = WorkspaceManager(workspace, config_manager)
+
+    result = manager.import_from(source)
+
+    assert result == OperationResult(success=True)
+    assert not (workspace / ".env").exists()
+    assert (workspace / "CLAUDE.md").read_text() == "content"
+
+
+def test_export_to_respects_gitignore_in_destination_protects_listed_file(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "CLAUDE.md").write_text("new content")
+    destination = tmp_path / "destination"
+    destination.mkdir()
+    (destination / ".gitignore").write_text(".env\n")
+    (destination / ".env").write_text("original secret")
+    config_manager = ConfigManager(tmp_path / "config.toml")
+    config_manager.config["respect_gitignore"] = True
+    manager = WorkspaceManager(workspace, config_manager)
+
+    result = manager.export_to(destination)
+
+    assert result == OperationResult(success=True)
+    assert (destination / ".env").read_text() == "original secret"
+    assert (destination / "CLAUDE.md").read_text() == "new content"
+
+
+def test_import_from_with_respect_gitignore_false_imports_gitignored_file(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / ".gitignore").write_text(".env\n")
+    (source / ".env").write_text("secret")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    config_manager = ConfigManager(tmp_path / "config.toml")
+    config_manager.config["respect_gitignore"] = False
+    manager = WorkspaceManager(workspace, config_manager)
+
+    result = manager.import_from(source)
+
+    assert result == OperationResult(success=True)
+    assert (workspace / ".env").read_text() == "secret"
+
+
+def test_export_to_with_respect_gitignore_false_deletes_gitignored_file(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    destination = tmp_path / "destination"
+    destination.mkdir()
+    (destination / ".gitignore").write_text(".env\n")
+    (destination / ".env").write_text("original secret")
+    config_manager = ConfigManager(tmp_path / "config.toml")
+    config_manager.config["respect_gitignore"] = False
+    manager = WorkspaceManager(workspace, config_manager)
+
+    result = manager.export_to(destination)
+
+    assert result == OperationResult(success=True)
+    assert not (destination / ".env").exists()
+
+
+def test_export_to_without_gitignore_in_destination_still_succeeds(tmp_path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "CLAUDE.md").write_text("content")
+    destination = tmp_path / "destination"
+    config_manager = ConfigManager(tmp_path / "config.toml")
+    config_manager.config["respect_gitignore"] = True
+    manager = WorkspaceManager(workspace, config_manager)
+
+    result = manager.export_to(destination)
+
+    assert result == OperationResult(success=True)
+    assert (destination / "CLAUDE.md").read_text() == "content"
+
+
+def test_import_from_without_gitignore_in_source_still_succeeds(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "CLAUDE.md").write_text("content")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    config_manager = ConfigManager(tmp_path / "config.toml")
+    config_manager.config["respect_gitignore"] = True
+    manager = WorkspaceManager(workspace, config_manager)
+
+    result = manager.import_from(source)
+
+    assert result == OperationResult(success=True)
+    assert (workspace / "CLAUDE.md").read_text() == "content"
+
+
+def test_export_gitignore_filter_args_empty_for_remote_destination_string(tmp_path):
+    config_manager = ConfigManager(tmp_path / "config.toml")
+    config_manager.config["respect_gitignore"] = True
+    manager = WorkspaceManager(tmp_path, config_manager)
+
+    assert manager._export_gitignore_filter_args("user@host:/pfad") == []
+
+
+def test_export_gitignore_filter_args_empty_when_gitignore_missing(tmp_path):
+    config_manager = ConfigManager(tmp_path / "config.toml")
+    config_manager.config["respect_gitignore"] = True
+    manager = WorkspaceManager(tmp_path, config_manager)
+
+    assert manager._export_gitignore_filter_args(tmp_path) == []

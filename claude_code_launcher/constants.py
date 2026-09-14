@@ -82,6 +82,8 @@ RSYNC_BINARY = "rsync"
 RSYNC_BASE_ARGS = ["-a", "--delete"]
 RSYNC_DELETE_EXCLUDED_ARG = "--delete-excluded"
 RSYNC_FILE_COPY_ARGS = ["-a"]  # Single-File-Kopie, kein --delete nötig
+RSYNC_GITIGNORE_FILENAME = ".gitignore"
+RSYNC_GITIGNORE_IMPORT_FILTER_ARG = f"--filter=:- {RSYNC_GITIGNORE_FILENAME}"
 
 # --- VS Code CLI (Importquelle öffnen) ---
 VSCODE_BINARY = "code"

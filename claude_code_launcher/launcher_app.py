@@ -650,7 +650,10 @@ class LauncherApp:
         binary = self.config_manager.config.get("prompt_manager_binary", "qDrover")
         args = self.config_manager.config.get("prompt_manager_args", [])
         try:
-            subprocess.run([binary, *args], cwd=str(self.workspace_manager.workspace))
+            subprocess.run(
+                [str(Path(binary).expanduser()), *args],
+                cwd=str(self.workspace_manager.workspace),
+            )
         except FileNotFoundError:
             curses.wrapper(
                 curses_message,

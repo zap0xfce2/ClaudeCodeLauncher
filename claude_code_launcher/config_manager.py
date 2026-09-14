@@ -37,6 +37,7 @@ class ConfigManager:
             "claude_instruction": "",
             "ask_for_reset": True,
             "dont_ask_on_export_overwrite": False,
+            "respect_gitignore": False,
             "mouse_navigation_enabled": True,
             "recent_shortcuts": [],
             "usage_cache": {},

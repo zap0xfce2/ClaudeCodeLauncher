@@ -29,7 +29,7 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 - Python 3.11+
 - `rsync` (für Export/Import, Folder- wie Single-File-Modus, auch für SSH-Remote-Ziele; auf macOS vorinstalliert)
 - `code`-CLI von VS Code (optional, nur für „Importquelle in VS Code öffnen")
-- Prompt-Manager-CLI (optional, nur für „Prompts verwalten"; Name/Argumente über `prompt_manager_binary`/`prompt_manager_args` in `config.toml` konfigurierbar, Default `qDrover`)
+- Prompt-Manager-CLI (optional, nur für „Prompts verwalten"; Name/Argumente über `prompt_manager_binary`/`prompt_manager_args` in `config.toml` konfigurierbar, Default [`qDrover`](https://github.com/zap0xfce2/qDrover))
 - [Task](https://taskfile.dev) (nur für den Build)
 - [uv](https://docs.astral.sh/uv/) (Dependency-Management; installiert auch [Nuitka](https://nuitka.net) für den Build)
 

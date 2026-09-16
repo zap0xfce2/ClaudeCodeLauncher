@@ -22,7 +22,6 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 - **Workspace-Übersicht** – Mehrspaltige, nach letzter Änderung sortierte Dateiliste für schnelle Projekterkennung in breiten Terminal-Fenstern; Punkt-Ordner (z. B. `.git`) erscheinen als ein Eintrag mit rekursiv berechneter Gesamtgröße statt mit ihrem vollständigen Inhalt; 📁/📄-Symbole unterscheiden Ordner- und Datei-Einträge; `Enter`/Maus-Klick kopiert den Dateinamen des markierten Eintrags in die Zwischenablage
 - **Shell-Zugang** – Terminal im Workspace-Verzeichnis öffnen
 - **Prompts verwalten** – konfigurierbarer Prompt-Manager (`prompt_manager_binary`/`prompt_manager_args` in `config.toml`, Default `qDrover`) im Workspace-Verzeichnis öffnen
-- **Terminal-Theme-Sync** – Claude-Theme wird automatisch mit Dark/Light Mode synchronisiert: macOS via `defaults`, Linux via OSC-11-Terminal-Query (zsh-Funktion `_prompt_is_dark`, siehe Linux/Alpine-Betrieb)
 - **Claude-Nutzungsstatistik** – Session-/Weekly-Auslastung samt "Aktualisiert"-Zeitstempel via `openusage`-CLI (falls installiert); wird in `config.toml` zwischengespeichert, sodass sie auch bei einer fehlgeschlagenen Neu-Abfrage sichtbar bleibt
 
 ## Voraussetzungen
@@ -43,7 +42,6 @@ Entwickelt und primär getestet auf macOS. Läuft grundsätzlich auch auf einer 
 - **`zstandard`**: ebenfalls automatisch über `uv sync` aus der `dev`-Dependency-Group (plattformunabhängig, kein `sys_platform`-Marker) – ohne das Paket kann Nuitka das Onefile-Binary nicht komprimieren (`WARNING: Onefile mode cannot compress without 'zstandard' package installed`), der Build funktioniert aber auch ohne, nur mit größerer Ausgabedatei
 - **`ccache`**: optionales Systempaket (`apk add ccache`), beschleunigt nur wiederholte Nuitka-Rekompilierung – ohne installiertes Paket erscheint lediglich eine Warnung (`You are not using ccache`), kein Build-Fehler
 - **Clipboard**: Kopiert Dateinamen (`Enter`/Klick in „Inhalt anzeigen") auf Nicht-macOS-Systemen per [OSC 52](https://sunaku.github.io/tmux-yank-osc52.html) statt `pbcopy` – das jeweilige Terminal-Programm (z. B. iTerm2, kitty, WezTerm, Windows Terminal, foot, alacritty) muss das unterstützen und fängt die Sequenz über SSH ab, ganz ohne Display-Server. Unterstützt das Terminal es nicht, passiert einfach nichts (kein Fehler sichtbar)
-- **Terminal-Theme-Sync**: auf Linux via zsh-Funktion `_prompt_is_dark` (OSC-11-Terminal-Query, funktioniert auch über SSH ohne Display-Server); Voraussetzung: `zsh` sowie das Skript unter `~/.oh-my-zsh/custom/prompt_is_dark.zsh`. Fehlt eines von beidem, bleibt die Theme-Anpassung wie zuvor einfach inaktiv (kein Fehler)
 - **Login-Shell-PATH-Probe** (`_load_login_shell_path`): liest `$SHELL` dynamisch, nicht auf zsh hartcodiert – getestet mit zsh + oh-my-zsh; mit einer minimalistischen Shell wie BusyBox `ash` ungetestet
 
 ## Installation & Setup

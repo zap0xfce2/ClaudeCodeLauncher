@@ -2,22 +2,17 @@
 
 import base64
 import os
-import shlex
 import subprocess
 import sys
-from pathlib import Path
 
 from .constants import (
     CLIPBOARD_BINARY,
     CLIPBOARD_COPY_TIMEOUT,
     DEFAULT_SHELL,
-    LINUX_THEME_DETECTION_TIMEOUT,
     LOGIN_SHELL_PATH_PROBE_TIMEOUT,
     OSC52_CLIPBOARD_TEMPLATE,
     PATH_PROBE_END_MARKER,
     PATH_PROBE_START_MARKER,
-    PROMPT_IS_DARK_SCRIPT_RELATIVE_PATH,
-    ZSH_BINARY,
 )
 
 
@@ -81,28 +76,3 @@ def _load_login_shell_path() -> str | None:
     if not start_found or not end_found or not path:
         return None
     return path
-
-
-def _detect_linux_terminal_theme() -> str | None:
-    """Fragt Dark/Light per OSC-11 ab (zsh-Funktion _prompt_is_dark), None bei Fehler/Timeout.
-
-    Exit-Code der Funktion: 0 = dark, 1 = light. Braucht ein echtes Terminal
-    (/dev/tty) und zsh + oh-my-zsh-Skript; ohne beides graceful No-Op.
-    """
-    script_path = Path.home() / PROMPT_IS_DARK_SCRIPT_RELATIVE_PATH
-    if not script_path.is_file():
-        return None
-    probe_command = f"source {shlex.quote(str(script_path))} && _prompt_is_dark"
-    try:
-        result = subprocess.run(
-            [ZSH_BINARY, "-c", probe_command],
-            capture_output=True,
-            timeout=LINUX_THEME_DETECTION_TIMEOUT,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if result.returncode == 0:
-        return "dark"
-    if result.returncode == 1:
-        return "light"
-    return None

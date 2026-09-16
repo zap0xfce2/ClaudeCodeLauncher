@@ -1,10 +1,8 @@
 """Haupt-Controller: hält ConfigManager + WorkspaceManager, orchestriert alle curses-Dialoge."""
 
 import curses
-import json
 import os
 import subprocess
-import sys
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -14,12 +12,10 @@ from .constants import (
     ACTION_TO_SHORTCUT,
     CLEAR_BINARY,
     DEFAULT_SHELL,
-    DEFAULTS_BINARY,
     SHORTCUT_LABELS,
     VSCODE_BINARY,
 )
 from .remote_target import _is_remote_target, _remote_path_part
-from .system_helpers import _detect_linux_terminal_theme
 from .ui_curses import (
     curses_browse,
     curses_confirm,
@@ -582,7 +578,6 @@ class LauncherApp:
 
         try:
             subprocess.run([CLEAR_BINARY], check=False)
-            self._apply_terminal_theme()
 
             env = os.environ.copy()
             env.update(self.config_manager.config.get("claude_env", {}))
@@ -606,44 +601,6 @@ class LauncherApp:
             print(f"✗ Fehler beim Starten von Claude: {e}")
 
         return True
-
-    def _apply_terminal_theme(self) -> None:
-        """Setzt Claude-Theme (~/.claude.json): macOS via defaults, Linux via OSC-11-Skript."""
-        if sys.platform == "darwin":
-            theme = self._detect_macos_theme()
-        elif sys.platform.startswith("linux"):
-            theme = _detect_linux_terminal_theme()
-        else:
-            return
-
-        if theme is None:
-            return
-        self._write_claude_theme(theme)
-
-    def _detect_macos_theme(self) -> str:
-        """Liest macOS Dark/Light Mode via defaults CLI."""
-        result = subprocess.run(
-            [DEFAULTS_BINARY, "read", "-g", "AppleInterfaceStyle"],
-            capture_output=True,
-            text=True,
-        )
-        # Kein Output = Light Mode (macOS Standard wenn kein Dark Mode aktiv)
-        return "dark" if result.stdout.strip() == "Dark" else "light"
-
-    def _write_claude_theme(self, theme: str) -> None:
-        """Schreibt theme in ~/.claude.json, restliche Settings bleiben erhalten."""
-        claude_json_path = Path.home() / ".claude.json"
-        settings: dict[str, Any] = {}
-        if claude_json_path.exists():
-            try:
-                with open(claude_json_path, "r") as f:
-                    settings = json.load(f)
-            except json.JSONDecodeError:
-                settings = {}
-
-        settings["theme"] = theme
-        with open(claude_json_path, "w") as f:
-            json.dump(settings, f, indent=2)
 
     def handle_browse(self) -> None:
         """Zeigt Workspace-Inhalt in scrollbarer Ansicht."""

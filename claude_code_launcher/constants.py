@@ -88,15 +88,6 @@ RSYNC_GITIGNORE_IMPORT_FILTER_ARG = f"--filter=:- {RSYNC_GITIGNORE_FILENAME}"
 # --- VS Code CLI (Importquelle öffnen) ---
 VSCODE_BINARY = "code"
 
-# --- Terminal-Theme-Erkennung (launch_claude) ---
-DEFAULTS_BINARY = "defaults"  # macOS: defaults read -g AppleInterfaceStyle
-# Linux: OSC-11-Terminal-Query via zsh-Funktion _prompt_is_dark, siehe
-# _detect_linux_terminal_theme() in system_helpers.py
-ZSH_BINARY = "zsh"
-PROMPT_IS_DARK_SCRIPT_RELATIVE_PATH = ".oh-my-zsh/custom/prompt_is_dark.zsh"
-# Skript-Worst-Case laut eigenem Kommentar ~4s (zwei OSC-11-Terminatoren à read -t 2) + Puffer
-LINUX_THEME_DETECTION_TIMEOUT = 6
-
 # --- Terminal leeren vor Claude-Start (launch_claude) ---
 CLEAR_BINARY = "/usr/bin/clear"
 

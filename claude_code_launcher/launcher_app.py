@@ -19,6 +19,7 @@ from .constants import (
     VSCODE_BINARY,
 )
 from .remote_target import _is_remote_target, _remote_path_part
+from .system_helpers import _detect_linux_terminal_theme
 from .ui_curses import (
     curses_browse,
     curses_confirm,
@@ -581,7 +582,7 @@ class LauncherApp:
 
         try:
             subprocess.run([CLEAR_BINARY], check=False)
-            self._apply_macos_theme()
+            self._apply_terminal_theme()
 
             env = os.environ.copy()
             env.update(self.config_manager.config.get("claude_env", {}))
@@ -606,18 +607,31 @@ class LauncherApp:
 
         return True
 
-    def _apply_macos_theme(self) -> None:
-        """Setzt Claude-Theme (~/.claude.json) basierend auf macOS Dark/Light Mode."""
-        if sys.platform != "darwin":
+    def _apply_terminal_theme(self) -> None:
+        """Setzt Claude-Theme (~/.claude.json): macOS via defaults, Linux via OSC-11-Skript."""
+        if sys.platform == "darwin":
+            theme = self._detect_macos_theme()
+        elif sys.platform.startswith("linux"):
+            theme = _detect_linux_terminal_theme()
+        else:
             return
+
+        if theme is None:
+            return
+        self._write_claude_theme(theme)
+
+    def _detect_macos_theme(self) -> str:
+        """Liest macOS Dark/Light Mode via defaults CLI."""
         result = subprocess.run(
             [DEFAULTS_BINARY, "read", "-g", "AppleInterfaceStyle"],
             capture_output=True,
             text=True,
         )
         # Kein Output = Light Mode (macOS Standard wenn kein Dark Mode aktiv)
-        theme = "dark" if result.stdout.strip() == "Dark" else "light"
+        return "dark" if result.stdout.strip() == "Dark" else "light"
 
+    def _write_claude_theme(self, theme: str) -> None:
+        """Schreibt theme in ~/.claude.json, restliche Settings bleiben erhalten."""
         claude_json_path = Path.home() / ".claude.json"
         settings: dict[str, Any] = {}
         if claude_json_path.exists():

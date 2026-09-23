@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import ANY
 
 import pytest
 
@@ -85,8 +86,9 @@ def test_add_to_history_real_export_replaces_synthetic_entry(tmp_path):
     manager = ConfigManager(tmp_path / "config.toml")
     manager.add_to_history(Path("/workspace/a"), "export", synthetic=True)
     manager.add_to_history(Path("/workspace/a"), "export")
-    assert len(manager.config["history"]) == 1
-    assert "synthetic" not in manager.config["history"][0]
+    assert manager.config["history"] == [
+        {"path": "/workspace/a", "timestamp": ANY, "type": "export"}
+    ]
 
 
 def test_add_to_history_raises_on_invalid_type(tmp_path):

@@ -192,7 +192,7 @@ Der Footer zeigt neben `[h]`/`[q]` dynamisch die vier zuletzt verwendeten Shortc
 | `Enter`                 | Auswahl bestätigen (Pfad-Auswahl: direkt übernehmen ohne Edit)       |
 | `ESC` / `q`             | Abbrechen                                                            |
 
-Im Pfad-Auswahlmodus (`allow_edit`) öffnet `Tab` einen vorausgefüllten Edit-Dialog; `Enter` übernimmt den Pfad direkt.
+Die Liste scrollt mit, wenn sie höher als das Terminal ist. Im Pfad-Auswahlmodus (`allow_edit`) öffnet `Tab` einen vorausgefüllten Edit-Dialog; `Enter` übernimmt den Pfad direkt.
 
 ### Inhalt anzeigen
 

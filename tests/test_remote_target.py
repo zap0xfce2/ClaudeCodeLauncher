@@ -19,9 +19,12 @@ def test_is_remote_target(path_str, expected):
     assert _is_remote_target(path_str) is expected
 
 
-def test_remote_path_part_strips_host_prefix():
-    assert _remote_path_part("user@host:/srv/backup/file.md") == "/srv/backup/file.md"
-
-
-def test_remote_path_part_strips_host_prefix_without_user():
-    assert _remote_path_part("host:relative/path") == "relative/path"
+@pytest.mark.parametrize(
+    ("path_str", "expected"),
+    [
+        ("user@host:/srv/backup/file.md", "/srv/backup/file.md"),
+        ("host:relative/path", "relative/path"),
+    ],
+)
+def test_remote_path_part_strips_host_prefix(path_str, expected):
+    assert _remote_path_part(path_str) == expected

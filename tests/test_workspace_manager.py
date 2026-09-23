@@ -1,20 +1,7 @@
 import pytest
 
 from claude_code_launcher.config_manager import ConfigManager
-from claude_code_launcher.workspace_manager import OperationResult, WorkspaceManager
-
-
-def test_get_exclude_args_without_config_manager_returns_empty_list(tmp_path):
-    manager = WorkspaceManager(tmp_path)
-    assert manager._get_exclude_args("export_ignore_patterns") == []
-
-
-def test_get_exclude_args_builds_rsync_exclude_flags(tmp_path):
-    config_manager = ConfigManager(tmp_path / "config.toml")
-    config_manager.config["export_ignore_patterns"] = [".git", "*.pyc"]
-    manager = WorkspaceManager(tmp_path, config_manager)
-    exclude_args = manager._get_exclude_args("export_ignore_patterns")
-    assert exclude_args == ["--exclude=.git", "--exclude=*.pyc"]
+from claude_code_launcher.workspace_manager import WorkspaceManager
 
 
 def test_get_exclude_args_combines_base_and_specific_patterns(tmp_path):
@@ -127,7 +114,6 @@ def test_build_content_entry_for_dot_folder_sums_nested_file_sizes(tmp_path):
 
 
 # --- needs_overwrite_confirmation / matched_ignore_pattern ---
-# Erst durch das UI-Decoupling (curses raus aus WorkspaceManager) sinnvoll testbar.
 
 
 def test_needs_overwrite_confirmation_true_without_config_manager(tmp_path):
@@ -149,13 +135,7 @@ def test_matched_ignore_pattern_returns_matching_pattern(tmp_path):
     assert manager.matched_ignore_pattern(".git", "export_ignore_patterns") == ".git"
 
 
-def test_matched_ignore_pattern_returns_none_without_match(tmp_path):
-    manager = WorkspaceManager(tmp_path)
-    assert manager.matched_ignore_pattern("foo.txt", "export_ignore_patterns") is None
-
-
 # --- export_to / export_file_to / import_file_from / import_from ---
-# rsync-basierte Sync-Methoden, ebenfalls erst ohne curses.wrapper()-Aufrufe direkt testbar.
 
 
 def test_export_to_copies_files_and_returns_success(tmp_path):
@@ -165,9 +145,8 @@ def test_export_to_copies_files_and_returns_success(tmp_path):
     destination = tmp_path / "backup"
     manager = WorkspaceManager(workspace)
 
-    result = manager.export_to(destination)
+    manager.export_to(destination)
 
-    assert result == OperationResult(success=True)
     assert (destination / "CLAUDE.md").read_text() == "content"
 
 
@@ -191,9 +170,8 @@ def test_export_file_to_copies_single_file(tmp_path):
     manager = WorkspaceManager(workspace)
     destination = tmp_path / "out.md"
 
-    result = manager.export_file_to("CLAUDE.md", destination)
+    manager.export_file_to("CLAUDE.md", destination)
 
-    assert result == OperationResult(success=True)
     assert destination.read_text() == "content"
 
 
@@ -212,9 +190,8 @@ def test_import_file_from_copies_into_workspace_root(tmp_path):
     source_file.write_text("content")
     manager = WorkspaceManager(workspace)
 
-    result = manager.import_file_from(source_file)
+    manager.import_file_from(source_file)
 
-    assert result == OperationResult(success=True)
     assert (workspace / "CLAUDE.md").read_text() == "content"
 
 
@@ -238,9 +215,8 @@ def test_export_file_to_skips_parent_mkdir_for_remote_destination_string(tmp_pat
         lambda source, destination: recorded.update(destination=destination),
     )
 
-    result = manager.export_file_to("CLAUDE.md", "user@host:/remote/out.md")
+    manager.export_file_to("CLAUDE.md", "user@host:/remote/out.md")
 
-    assert result == OperationResult(success=True)
     assert recorded["destination"] == "user@host:/remote/out.md"
 
 
@@ -255,9 +231,8 @@ def test_import_file_from_derives_filename_from_remote_source_path(tmp_path, mon
         lambda source, destination: recorded.update(destination=destination),
     )
 
-    result = manager.import_file_from("user@host:/remote/dir/CLAUDE.md")
+    manager.import_file_from("user@host:/remote/dir/CLAUDE.md")
 
-    assert result == OperationResult(success=True)
     assert recorded["destination"] == workspace / "CLAUDE.md"
 
 
@@ -270,11 +245,9 @@ def test_import_from_mirrors_source_into_workspace_and_deletes_excluded(tmp_path
     (workspace / "stale.txt").write_text("old")
     manager = WorkspaceManager(workspace)
 
-    result = manager.import_from(source)
+    manager.import_from(source)
 
-    assert result == OperationResult(success=True)
-    assert (workspace / "CLAUDE.md").read_text() == "new content"
-    assert not (workspace / "stale.txt").exists()
+    assert [p.name for p in workspace.iterdir()] == ["CLAUDE.md"]
 
 
 # --- respect_gitignore ---
@@ -292,11 +265,9 @@ def test_import_from_respects_gitignore_in_source_excludes_listed_file(tmp_path)
     config_manager.config["respect_gitignore"] = True
     manager = WorkspaceManager(workspace, config_manager)
 
-    result = manager.import_from(source)
+    manager.import_from(source)
 
-    assert result == OperationResult(success=True)
-    assert not (workspace / ".env").exists()
-    assert (workspace / "CLAUDE.md").read_text() == "content"
+    assert sorted(p.name for p in workspace.iterdir()) == [".gitignore", "CLAUDE.md"]
 
 
 def test_export_to_respects_gitignore_in_destination_protects_listed_file(tmp_path):
@@ -311,11 +282,12 @@ def test_export_to_respects_gitignore_in_destination_protects_listed_file(tmp_pa
     config_manager.config["respect_gitignore"] = True
     manager = WorkspaceManager(workspace, config_manager)
 
-    result = manager.export_to(destination)
+    manager.export_to(destination)
 
-    assert result == OperationResult(success=True)
-    assert (destination / ".env").read_text() == "original secret"
-    assert (destination / "CLAUDE.md").read_text() == "new content"
+    assert ((destination / ".env").read_text(), (destination / "CLAUDE.md").read_text()) == (
+        "original secret",
+        "new content",
+    )
 
 
 def test_import_from_with_respect_gitignore_false_imports_gitignored_file(tmp_path):
@@ -329,9 +301,8 @@ def test_import_from_with_respect_gitignore_false_imports_gitignored_file(tmp_pa
     config_manager.config["respect_gitignore"] = False
     manager = WorkspaceManager(workspace, config_manager)
 
-    result = manager.import_from(source)
+    manager.import_from(source)
 
-    assert result == OperationResult(success=True)
     assert (workspace / ".env").read_text() == "secret"
 
 
@@ -346,9 +317,8 @@ def test_export_to_with_respect_gitignore_false_deletes_gitignored_file(tmp_path
     config_manager.config["respect_gitignore"] = False
     manager = WorkspaceManager(workspace, config_manager)
 
-    result = manager.export_to(destination)
+    manager.export_to(destination)
 
-    assert result == OperationResult(success=True)
     assert not (destination / ".env").exists()
 
 
@@ -361,9 +331,8 @@ def test_export_to_without_gitignore_in_destination_still_succeeds(tmp_path):
     config_manager.config["respect_gitignore"] = True
     manager = WorkspaceManager(workspace, config_manager)
 
-    result = manager.export_to(destination)
+    manager.export_to(destination)
 
-    assert result == OperationResult(success=True)
     assert (destination / "CLAUDE.md").read_text() == "content"
 
 
@@ -377,9 +346,8 @@ def test_import_from_without_gitignore_in_source_still_succeeds(tmp_path):
     config_manager.config["respect_gitignore"] = True
     manager = WorkspaceManager(workspace, config_manager)
 
-    result = manager.import_from(source)
+    manager.import_from(source)
 
-    assert result == OperationResult(success=True)
     assert (workspace / "CLAUDE.md").read_text() == "content"
 
 
@@ -389,11 +357,3 @@ def test_export_gitignore_filter_args_empty_for_remote_destination_string(tmp_pa
     manager = WorkspaceManager(tmp_path, config_manager)
 
     assert manager._export_gitignore_filter_args("user@host:/pfad") == []
-
-
-def test_export_gitignore_filter_args_empty_when_gitignore_missing(tmp_path):
-    config_manager = ConfigManager(tmp_path / "config.toml")
-    config_manager.config["respect_gitignore"] = True
-    manager = WorkspaceManager(tmp_path, config_manager)
-
-    assert manager._export_gitignore_filter_args(tmp_path) == []

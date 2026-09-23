@@ -187,14 +187,24 @@ def _menu_item_at_position(
     )
 
 
+def _scroll_offset(current: int, viewport_height: int) -> int:
+    """Kleinster Offset, bei dem die Zeile `current` noch im Viewport liegt."""
+    return max(0, current - viewport_height + 1)
+
+
 def _select_item_at_position(
-    items: list[tuple[str, str]], mouse_y: int, mouse_x: int, height: int
+    items: list[tuple[str, str]],
+    scroll_offset: int,
+    mouse_y: int,
+    mouse_x: int,
+    height: int,
 ) -> int | None:
-    """Hit-Test für curses_select(): einspaltige Liste ohne Scroll-Offset (anders als curses_browse())."""
-    i = mouse_y - MENU_START_ROW
-    if i < 0 or i >= len(items):
+    """Hit-Test für curses_select(): einspaltige Liste mit Scroll-Offset."""
+    row = mouse_y - MENU_START_ROW
+    if row < 0 or mouse_y >= height - 3:
         return None
-    if MENU_START_ROW + i >= height - 3:
+    i = scroll_offset + row
+    if i >= len(items):
         return None
     _, label = items[i]
     item_width = MENU_ITEM_PREFIX_WIDTH + len(label)
@@ -726,11 +736,12 @@ def curses_select(
             )
 
             # Items (Platz für Hint-Zeile am Ende lassen)
-            for i, (_, label) in enumerate(items):
-                y = MENU_START_ROW + i
-                if y >= height - 3:
-                    break
-                if i == current:
+            viewport_height = max(1, height - 3 - MENU_START_ROW)
+            scroll_offset = _scroll_offset(current, viewport_height)
+            visible_items = items[scroll_offset : scroll_offset + viewport_height]
+            for row, (_, label) in enumerate(visible_items):
+                y = MENU_START_ROW + row
+                if scroll_offset + row == current:
                     stdscr.addstr(
                         y,
                         ITEM_INDENT_X,
@@ -762,7 +773,9 @@ def curses_select(
                     _, mouse_x, mouse_y, _, bstate = curses.getmouse()
                 except curses.error:
                     continue
-                hit = _select_item_at_position(items, mouse_y, mouse_x, height)
+                hit = _select_item_at_position(
+                    items, scroll_offset, mouse_y, mouse_x, height
+                )
                 if hit is None:
                     continue
                 current = hit
@@ -854,11 +867,7 @@ def curses_browse(
                 items, width
             )
             current_row = current % rows
-            scroll_offset = (
-                max(0, current_row - viewport_height + 1)
-                if current_row >= viewport_height
-                else 0
-            )
+            scroll_offset = _scroll_offset(current_row, viewport_height)
 
             # Dateiliste spaltenweise rendern
             list_start_y = 4

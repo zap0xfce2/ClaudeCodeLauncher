@@ -22,37 +22,25 @@ def test_resolve_xterm256_color_returns_fallback_below_256_colors(monkeypatch):
 # --- Navigations-Tasten ---
 
 
-@pytest.mark.parametrize("key", [curses.KEY_UP, curses.KEY_BTAB])
-def test_is_up_key_true_for_up_and_shift_tab(key):
-    assert ui_curses._is_up_key(key) is True
-
-
-def test_is_up_key_false_for_other_key():
-    assert ui_curses._is_up_key(curses.KEY_DOWN) is False
-
-
-def test_is_down_key_true_for_down():
-    assert ui_curses._is_down_key(curses.KEY_DOWN) is True
+@pytest.mark.parametrize(
+    ("is_key", "key", "expected"),
+    [
+        (ui_curses._is_up_key, curses.KEY_UP, True),
+        (ui_curses._is_up_key, curses.KEY_BTAB, True),
+        (ui_curses._is_up_key, curses.KEY_DOWN, False),
+        (ui_curses._is_down_key, curses.KEY_DOWN, True),
+        (ui_curses._is_left_key, curses.KEY_LEFT, True),
+        (ui_curses._is_left_key, curses.KEY_RIGHT, False),
+        (ui_curses._is_right_key, curses.KEY_RIGHT, True),
+        (ui_curses._is_right_key, curses.KEY_LEFT, False),
+    ],
+)
+def test_navigation_keys(is_key, key, expected):
+    assert is_key(key) is expected
 
 
 def test_is_down_key_tab_respects_include_tab_flag():
     assert ui_curses._is_down_key(KEY_TAB, include_tab=False) is False
-
-
-def test_is_left_key_true_for_left():
-    assert ui_curses._is_left_key(curses.KEY_LEFT) is True
-
-
-def test_is_left_key_false_for_right():
-    assert ui_curses._is_left_key(curses.KEY_RIGHT) is False
-
-
-def test_is_right_key_true_for_right():
-    assert ui_curses._is_right_key(curses.KEY_RIGHT) is True
-
-
-def test_is_right_key_false_for_left():
-    assert ui_curses._is_right_key(curses.KEY_LEFT) is False
 
 
 # --- _split_menu_columns / _swap_menu_column ---
@@ -113,7 +101,14 @@ def test_menu_column_hit_index_misses(mouse_y, mouse_x, height):
     assert hit is None
 
 
-def test_menu_item_at_position_hits_second_column():
+@pytest.mark.parametrize(
+    ("mouse_x", "expected"),
+    [
+        (13, 1),  # Treffer in Spalte 2
+        (9, None),  # Lücke zwischen den Spalten
+    ],
+)
+def test_menu_item_at_position(mouse_x, expected):
     hit = ui_curses._menu_item_at_position(
         [(0, "Plan")],
         [(1, "Start")],
@@ -122,25 +117,10 @@ def test_menu_item_at_position_hits_second_column():
         col1_label_width=4,
         col2_label_width=5,
         mouse_y=4,
-        mouse_x=13,
+        mouse_x=mouse_x,
         height=20,
     )
-    assert hit == 1
-
-
-def test_menu_item_at_position_miss_returns_none():
-    hit = ui_curses._menu_item_at_position(
-        [(0, "Plan")],
-        [(1, "Start")],
-        col1_x=2,
-        col2_x=12,
-        col1_label_width=4,
-        col2_label_width=5,
-        mouse_y=4,
-        mouse_x=9,
-        height=20,
-    )
-    assert hit is None
+    assert hit == expected
 
 
 # --- _compute_browse_column_layout ---
@@ -210,14 +190,10 @@ def test_browse_grid_item_at_position_misses(mouse_y, mouse_x):
 # --- _confirm_choice_at_position ---
 
 
-def test_confirm_choice_at_position_hits_ja():
-    hit = ui_curses._confirm_choice_at_position(["Ja", "Nein"], choice_x=2, y=10, mouse_y=10, mouse_x=3)
-    assert hit == 0
-
-
-def test_confirm_choice_at_position_hits_nein():
-    hit = ui_curses._confirm_choice_at_position(["Ja", "Nein"], choice_x=2, y=10, mouse_y=10, mouse_x=9)
-    assert hit == 1
+@pytest.mark.parametrize(("mouse_x", "expected"), [(3, 0), (9, 1)])
+def test_confirm_choice_at_position_hits(mouse_x, expected):
+    hit = ui_curses._confirm_choice_at_position(["Ja", "Nein"], choice_x=2, y=10, mouse_y=10, mouse_x=mouse_x)
+    assert hit == expected
 
 
 @pytest.mark.parametrize(
@@ -232,3 +208,36 @@ def test_confirm_choice_at_position_misses(mouse_y, mouse_x):
         ["Ja", "Nein"], choice_x=2, y=10, mouse_y=mouse_y, mouse_x=mouse_x
     )
     assert hit is None
+
+
+# --- _scroll_offset / _select_item_at_position ---
+
+SELECT_ITEMS = [(f"/pfad/{i}", f"Eintrag {i}") for i in range(10)]
+
+
+@pytest.mark.parametrize(
+    ("current", "expected"),
+    [
+        (2, 0),  # innerhalb des Viewports
+        (7, 5),  # darunter -> Viewport folgt
+    ],
+)
+def test_scroll_offset(current, expected):
+    assert ui_curses._scroll_offset(current, viewport_height=3) == expected
+
+
+def test_select_item_at_position_applies_scroll_offset():
+    hit = ui_curses._select_item_at_position(SELECT_ITEMS, scroll_offset=5, mouse_y=4, mouse_x=6, height=10)
+    assert hit == 5
+
+
+@pytest.mark.parametrize(
+    ("scroll_offset", "mouse_y"),
+    [
+        (0, 7),  # Hint-Bereich (height - 3)
+        (8, 6),  # hinter dem letzten Eintrag
+        (0, 3),  # oberhalb der Liste
+    ],
+)
+def test_select_item_at_position_misses(scroll_offset, mouse_y):
+    assert ui_curses._select_item_at_position(SELECT_ITEMS, scroll_offset, mouse_y, mouse_x=6, height=10) is None

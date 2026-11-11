@@ -130,8 +130,8 @@ class LauncherApp:
         )
         last_import = next((h for h in all_history if h.get("type") == "import"), None)
         last_reset_ts = self.config_manager.config.get("last_reset_timestamp")
-        export_line = self._get_export_line(last_export, last_reset_ts)
-        import_line = self._get_import_line(last_import)
+        export_line = self._get_history_line("Export", last_export, last_reset_ts)
+        import_line = self._get_history_line("Import", last_import, last_reset_ts)
 
         content_line = (
             "   (leer)"
@@ -144,25 +144,17 @@ class LauncherApp:
         )
 
     @staticmethod
-    def _get_export_line(last_export: dict | None, last_reset_ts: str | None) -> str:
-        """Export-Info-Zeile, nur wenn der Export neuer als der letzte Reset ist."""
-        if not last_export:
+    def _get_history_line(
+        label: str, entry: dict | None, last_reset_ts: str | None
+    ) -> str:
+        """History-Info-Zeile, nur wenn der Eintrag neuer als der letzte Reset ist."""
+        if not entry:
             return ""
-        export_ts = datetime.fromisoformat(last_export["timestamp"])
-        reset_ts = datetime.fromisoformat(last_reset_ts) if last_reset_ts else None
-        if reset_ts is None or export_ts > reset_ts:
-            folder_name = Path(last_export["path"]).name
-            return f"   Letzter Export: {export_ts.strftime('%d.%m.%Y %H:%M')} ({folder_name})\n"
-        return ""
-
-    @staticmethod
-    def _get_import_line(last_import: dict | None) -> str:
-        """Import-Info-Zeile, kein Reset-Bezug (Reset betrifft nur Export)."""
-        if not last_import:
+        entry_ts = datetime.fromisoformat(entry["timestamp"])
+        if last_reset_ts and entry_ts <= datetime.fromisoformat(last_reset_ts):
             return ""
-        import_ts = datetime.fromisoformat(last_import["timestamp"])
-        folder_name = Path(last_import["path"]).name
-        return f"   Letzter Import: {import_ts.strftime('%d.%m.%Y %H:%M')} ({folder_name})\n"
+        folder_name = Path(entry["path"]).name
+        return f"   Letzter {label}: {entry_ts.strftime('%d.%m.%Y %H:%M')} ({folder_name})\n"
 
     @staticmethod
     def _build_usage_stats_text(usage: dict[str, Any] | None) -> str | None:

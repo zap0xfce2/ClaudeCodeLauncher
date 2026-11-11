@@ -1,7 +1,11 @@
 import pytest
 
 from claude_code_launcher.config_manager import ConfigManager
-from claude_code_launcher.workspace_manager import WorkspaceManager
+from claude_code_launcher.workspace_manager import (
+    WorkspaceManager,
+    _format_progress,
+    _is_rsync_item_line,
+)
 
 
 def test_get_exclude_args_combines_base_and_specific_patterns(tmp_path):
@@ -357,3 +361,35 @@ def test_export_gitignore_filter_args_empty_for_remote_destination_string(tmp_pa
     manager = WorkspaceManager(tmp_path, config_manager)
 
     assert manager._export_gitignore_filter_args("user@host:/pfad") == []
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        (">f+++++++ CLAUDE.md\n", True),
+        ("cd+++++++ sub/\n", True),
+        ("*deleting alt.txt\n", True),
+        ("sending incremental file list\n", False),
+        ("created directory backup\n", False),
+    ],
+)
+def test_is_rsync_item_line(line, expected):
+    assert _is_rsync_item_line(line) is expected
+
+
+def test_format_progress_shows_percent_and_counts():
+    assert _format_progress("Export", 1, 4) == "\r  Export:  25 % (1/4)"
+
+
+def test_format_progress_clamps_when_done_exceeds_total():
+    assert _format_progress("Import", 5, 4) == "\r  Import: 100 % (4/4)"
+
+
+def test_export_to_prints_full_progress(tmp_path, capsys):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / "CLAUDE.md").write_text("content")
+    manager = WorkspaceManager(workspace)
+
+    manager.export_to(tmp_path / "backup")
+
+    assert "Export: 100 %" in capsys.readouterr().out

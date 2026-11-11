@@ -84,6 +84,12 @@ RSYNC_DELETE_EXCLUDED_ARG = "--delete-excluded"
 RSYNC_FILE_COPY_ARGS = ["-a"]  # Single-File-Kopie, kein --delete nötig
 RSYNC_GITIGNORE_FILENAME = ".gitignore"
 RSYNC_GITIGNORE_IMPORT_FILTER_ARG = f"--filter=:- {RSYNC_GITIGNORE_FILENAME}"
+RSYNC_DRY_RUN_ARG = "--dry-run"
+# --itemize-changes liefert laut rsync-Doku im Probelauf exakt dieselben Zeilen wie im echten Lauf
+RSYNC_ITEMIZE_ARG = "--itemize-changes"
+# Item-Zeile: Update-Typ (<>ch.*) + Dateityp (fdLDS), z. B. ">f+++++++ datei" oder "*deleting alt"
+RSYNC_ITEM_LINE_REGEX = r"^[<>ch.*][fdLDS]"
+PERCENT_MAX = 100
 
 # --- VS Code CLI (Importquelle öffnen) ---
 VSCODE_BINARY = "code"

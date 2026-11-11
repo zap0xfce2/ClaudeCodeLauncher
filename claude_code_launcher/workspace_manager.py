@@ -7,8 +7,11 @@ ohne curses testbar.
 
 import fnmatch
 import os
+import re
 import shutil
 import subprocess
+import tempfile
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
@@ -16,17 +19,36 @@ from typing import TYPE_CHECKING
 from .constants import (
     BYTES_PER_KB,
     BYTES_PER_MB,
+    PERCENT_MAX,
     RSYNC_BASE_ARGS,
     RSYNC_BINARY,
     RSYNC_DELETE_EXCLUDED_ARG,
+    RSYNC_DRY_RUN_ARG,
     RSYNC_FILE_COPY_ARGS,
     RSYNC_GITIGNORE_FILENAME,
     RSYNC_GITIGNORE_IMPORT_FILTER_ARG,
+    RSYNC_ITEM_LINE_REGEX,
+    RSYNC_ITEMIZE_ARG,
 )
 from .remote_target import _remote_path_part
 
 if TYPE_CHECKING:
     from .config_manager import ConfigManager
+
+RSYNC_MISSING_MESSAGE = "rsync wurde nicht gefunden (Installation prüfen)"
+
+
+def _is_rsync_item_line(line: str) -> bool:
+    """True für eine --itemize-changes-Zeile (Datei, Ordner, Löschung), nicht für Info-/Fehlerausgaben."""
+    return re.match(RSYNC_ITEM_LINE_REGEX, line) is not None
+
+
+def _format_progress(label: str, done: int, total: int) -> str:
+    """Überschreibbare Fortschrittszeile, z. B. "\r  Export:  42 % (120/285)"."""
+    # Ändert sich die Quelle zwischen Probelauf und Sync, kann done > total werden
+    done = min(done, total)
+    percent = done * PERCENT_MAX // total
+    return f"\r  {label}: {percent:3d} % ({done}/{total})"
 
 
 @dataclass
@@ -174,19 +196,56 @@ class WorkspaceManager:
         ]
 
     @staticmethod
-    def _run_rsync(cmd: list[str]) -> None:
-        """Führt einen rsync-Befehl aus.
+    def _check_rsync_exit(returncode: int, stderr: str) -> None:
+        """Wirft OSError bei Exit≠0, mit stderr als Fehlertext."""
+        if returncode != 0:
+            message = stderr.strip() or "unbekannter Fehler"
+            raise OSError(f"rsync fehlgeschlagen (Exit {returncode}): {message}")
+
+    @staticmethod
+    def _run_rsync(cmd: list[str]) -> str:
+        """Führt einen rsync-Befehl aus und gibt stdout zurück.
 
         Raises:
             OSError: Wenn rsync fehlt oder mit Fehler endet (z. B. SSH nicht erreichbar).
         """
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         except FileNotFoundError as e:
-            raise OSError("rsync wurde nicht gefunden (Installation prüfen)") from e
-        if result.returncode != 0:
-            stderr = result.stderr.strip() or "unbekannter Fehler"
-            raise OSError(f"rsync fehlgeschlagen (Exit {result.returncode}): {stderr}")
+            raise OSError(RSYNC_MISSING_MESSAGE) from e
+        WorkspaceManager._check_rsync_exit(result.returncode, result.stderr)
+        return result.stdout
+
+    @staticmethod
+    def _count_rsync_items(cmd: list[str]) -> int:
+        """Anzahl der Item-Zeilen, die cmd übertragen/löschen würde (Probelauf via --dry-run)."""
+        output = WorkspaceManager._run_rsync([cmd[0], RSYNC_DRY_RUN_ARG, *cmd[1:]])
+        return sum(1 for line in output.splitlines() if _is_rsync_item_line(line))
+
+    @staticmethod
+    def _stream_rsync_items(cmd: list[str]) -> Iterator[str]:
+        """Führt cmd aus und liefert jede Item-Zeile, sobald rsync sie ausgibt.
+
+        stderr landet in einer Temp-Datei statt einer Pipe, damit ein volles
+        stderr-Pipe-Buffer den Prozess nicht blockiert, während stdout gelesen wird.
+
+        Raises:
+            OSError: Wenn rsync fehlt oder mit Fehler endet.
+        """
+        with tempfile.TemporaryFile(mode="w+") as stderr_file:
+            try:
+                process = subprocess.Popen(
+                    cmd, stdout=subprocess.PIPE, stderr=stderr_file, text=True
+                )
+            except FileNotFoundError as e:
+                raise OSError(RSYNC_MISSING_MESSAGE) from e
+            with process:
+                assert process.stdout is not None  # stdout=PIPE garantiert einen Stream
+                for line in process.stdout:
+                    if _is_rsync_item_line(line):
+                        yield line
+            stderr_file.seek(0)
+            WorkspaceManager._check_rsync_exit(process.returncode, stderr_file.read())
 
     def _rsync_mirror(
         self,
@@ -194,16 +253,25 @@ class WorkspaceManager:
         destination: Path | str,
         pattern_key: str,
         delete_excluded: bool,
+        progress_label: str,
         extra_filter_args: list[str] = (),
     ) -> None:
-        """Spiegelt source nach destination via rsync (überträgt auch Löschungen)."""
-        cmd = [RSYNC_BINARY, *RSYNC_BASE_ARGS]
+        """Spiegelt source nach destination via rsync (überträgt auch Löschungen), mit %-Anzeige."""
+        cmd = [RSYNC_BINARY, *RSYNC_BASE_ARGS, RSYNC_ITEMIZE_ARG]
         if delete_excluded:
             cmd.append(RSYNC_DELETE_EXCLUDED_ARG)
         cmd.extend(extra_filter_args)
         cmd.extend(self._get_exclude_args(pattern_key))
         cmd.extend([f"{source}/", str(destination)])
-        self._run_rsync(cmd)
+
+        total = self._count_rsync_items(cmd)
+        try:
+            for done, _ in enumerate(self._stream_rsync_items(cmd), start=1):
+                if total:
+                    print(_format_progress(progress_label, done, total), end="", flush=True)
+        finally:
+            if total:
+                print()  # Fortschrittszeile abschließen, damit Folgemeldungen nicht darin landen
 
     def _rsync_copy_file(self, source: Path | str, destination: Path | str) -> None:
         """Kopiert eine einzelne Datei via rsync (lokal wie remote) statt shutil.copy2."""
@@ -281,6 +349,7 @@ class WorkspaceManager:
                 destination,
                 "export_ignore_patterns",
                 delete_excluded=False,
+                progress_label="Export",
                 extra_filter_args=self._export_gitignore_filter_args(destination),
             )
             print(f"✓ Erfolgreich exportiert nach: {destination}")
@@ -350,6 +419,7 @@ class WorkspaceManager:
                 self.workspace,
                 "import_ignore_patterns",
                 delete_excluded=True,
+                progress_label="Import",
                 extra_filter_args=self._import_gitignore_filter_args(),
             )
             print(f"✓ Erfolgreich importiert von: {source}")

@@ -17,6 +17,7 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 from .constants import (
+    ANSI_REWRITE_LINE,
     BYTES_PER_KB,
     BYTES_PER_MB,
     PERCENT_MAX,
@@ -44,11 +45,16 @@ def _is_rsync_item_line(line: str) -> bool:
 
 
 def _format_progress(label: str, done: int, total: int) -> str:
-    """Überschreibbare Fortschrittszeile, z. B. "\r  Export:  42 % (120/285)"."""
+    """Überschreibbare Fortschrittszeile, z. B. "  Export:  42 % (120/285)"."""
     # Ändert sich die Quelle zwischen Probelauf und Sync, kann done > total werden
     done = min(done, total)
     percent = done * PERCENT_MAX // total
-    return f"\r  {label}: {percent:3d} % ({done}/{total})"
+    return f"{ANSI_REWRITE_LINE}  {label}: {percent:3d} % ({done}/{total})"
+
+
+def _format_counting(label: str, counted: int) -> str:
+    """Überschreibbare Zählzeile während des Probelaufs, z. B. "  Export: zähle Einträge … 142"."""
+    return f"{ANSI_REWRITE_LINE}  {label}: zähle Einträge … {counted}"
 
 
 @dataclass
@@ -217,10 +223,16 @@ class WorkspaceManager:
         return result.stdout
 
     @staticmethod
-    def _count_rsync_items(cmd: list[str]) -> int:
-        """Anzahl der Item-Zeilen, die cmd übertragen/löschen würde (Probelauf via --dry-run)."""
-        output = WorkspaceManager._run_rsync([cmd[0], RSYNC_DRY_RUN_ARG, *cmd[1:]])
-        return sum(1 for line in output.splitlines() if _is_rsync_item_line(line))
+    def _count_rsync_items(cmd: list[str], label: str) -> int:
+        """Anzahl der Item-Zeilen, die cmd übertragen/löschen würde (Probelauf via --dry-run).
+
+        Zählt live mit, da der Probelauf bei großen Ordnern/SSH-Zielen spürbar dauert.
+        """
+        counted = 0
+        dry_run_cmd = [cmd[0], RSYNC_DRY_RUN_ARG, *cmd[1:]]
+        for counted, _ in enumerate(WorkspaceManager._stream_rsync_items(dry_run_cmd), start=1):
+            print(_format_counting(label, counted), end="", flush=True)
+        return counted
 
     @staticmethod
     def _stream_rsync_items(cmd: list[str]) -> Iterator[str]:
@@ -264,8 +276,9 @@ class WorkspaceManager:
         cmd.extend(self._get_exclude_args(pattern_key))
         cmd.extend([f"{source}/", str(destination)])
 
-        total = self._count_rsync_items(cmd)
+        total = 0
         try:
+            total = self._count_rsync_items(cmd, progress_label)
             for done, _ in enumerate(self._stream_rsync_items(cmd), start=1):
                 if total:
                     print(_format_progress(progress_label, done, total), end="", flush=True)

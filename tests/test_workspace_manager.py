@@ -3,6 +3,7 @@ import pytest
 from claude_code_launcher.config_manager import ConfigManager
 from claude_code_launcher.workspace_manager import (
     WorkspaceManager,
+    _format_counting,
     _format_progress,
     _is_rsync_item_line,
 )
@@ -377,11 +378,15 @@ def test_is_rsync_item_line(line, expected):
 
 
 def test_format_progress_shows_percent_and_counts():
-    assert _format_progress("Export", 1, 4) == "\r  Export:  25 % (1/4)"
+    assert _format_progress("Export", 1, 4) == "\r\x1b[K  Export:  25 % (1/4)"
 
 
 def test_format_progress_clamps_when_done_exceeds_total():
-    assert _format_progress("Import", 5, 4) == "\r  Import: 100 % (4/4)"
+    assert _format_progress("Import", 5, 4) == "\r\x1b[K  Import: 100 % (4/4)"
+
+
+def test_format_counting_shows_counted_entries():
+    assert _format_counting("Export", 142) == "\r\x1b[K  Export: zähle Einträge … 142"
 
 
 def test_export_to_prints_full_progress(tmp_path, capsys):

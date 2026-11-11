@@ -90,6 +90,8 @@ RSYNC_ITEMIZE_ARG = "--itemize-changes"
 # Item-Zeile: Update-Typ (<>ch.*) + Dateityp (fdLDS), z. B. ">f+++++++ datei" oder "*deleting alt"
 RSYNC_ITEM_LINE_REGEX = r"^[<>ch.*][fdLDS]"
 PERCENT_MAX = 100
+# Zeilenanfang + Rest der Zeile löschen, damit eine kürzere Fortschrittszeile keine Reste stehen lässt
+ANSI_REWRITE_LINE = "\r\x1b[K"
 
 # --- VS Code CLI (Importquelle öffnen) ---
 VSCODE_BINARY = "code"

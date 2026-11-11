@@ -9,7 +9,7 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 ## Features
 
 - **Session-Management** – Neue Session im Workspace starten
-- **Export / Import** – Workspace als Backup sichern und wiederherstellen (Folder-Modus via `rsync`: Löschungen im Workspace werden ins Exportziel übertragen); jeder Export warnt, wenn das Ziel vom letzten Import-Pfad abweicht; im Folder-Modus zeigt eine Fortschrittszeile den Stand in % (Basis: Anzahl übertragener/gelöschter Einträge, nicht Bytes – ein rsync-Probelauf zählt vorab)
+- **Export / Import** – Workspace als Backup sichern und wiederherstellen (Folder-Modus via `rsync`: Löschungen im Workspace werden ins Exportziel übertragen); jeder Export warnt, wenn das Ziel vom letzten Import-Pfad abweicht; im Folder-Modus zeigt eine Fortschrittszeile den Stand in % (Basis: Anzahl übertragener/gelöschter Einträge, nicht Bytes – ein rsync-Probelauf zählt vorab und zeigt dabei live „zähle Einträge … N“)
 - **Single-File-Modus** – Einzelne Dateien exportieren oder importieren
 - **SSH-Remote-Ziele** – Export/Import unterstützen neben lokalen Pfaden auch rsync-Remote-Ziele im SSH-Style (`user@host:/pfad` oder `host:/pfad`), sowohl im Folder- als auch im Single-File-Modus
 - **History** – Zuletzt verwendete Pfade werden gespeichert und vorgeschlagen; ein Import legt automatisch einen Export-Eintrag zum selben Pfad an, damit Quick-Export (`e`) direkt danach ohne Pfadauswahl funktioniert

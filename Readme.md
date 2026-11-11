@@ -133,7 +133,7 @@ Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann
 | `usage_cache`                  | Dict   | `{}`     | Zwischengespeicherte Claude-Nutzungsstatistik der letzten erfolgreichen `openusage`-Abfrage. Automatisch gepflegt, nicht manuell ändern |
 | `prompt_manager_binary`        | string | `"qDrover"` | Binary-Name/Pfad für den Prompt-Manager (Menüpunkt „Prompts verwalten", Hotkey `p`); `~` im Pfad wird aufgelöst                     |
 | `prompt_manager_args`          | Liste  | `[]`     | Zusätzliche Argumente für den Prompt-Manager-Aufruf                                                                                     |
-| `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern)                                                              |
+| `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern); blendet „Letzter Export“/„Letzter Import“ aus, bis wieder exportiert bzw. importiert wird |
 
 `claude_instruction` wird manuell in `config.toml` gepflegt; eine Änderung wirkt nach Drücken von `r` (Refresh) im Hauptmenü, ohne den Launcher neu zu starten. `r` fragt außerdem immer sofort die aktuelle Claude-Nutzungsstatistik neu ab (statt bis zu 5 Minuten alte gecachte Werte zu zeigen).
 

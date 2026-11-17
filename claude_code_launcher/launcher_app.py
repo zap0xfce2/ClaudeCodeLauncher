@@ -144,15 +144,23 @@ class LauncherApp:
         )
 
     @staticmethod
+    def _reset_since(entry: dict | None, last_reset_ts: str | None) -> bool:
+        """True, wenn seit dem History-Eintrag (bzw. ohne Eintrag überhaupt) ein Reset lief."""
+        if not last_reset_ts:
+            return False
+        if entry is None:
+            return True
+        entry_ts = datetime.fromisoformat(entry["timestamp"])
+        return entry_ts <= datetime.fromisoformat(last_reset_ts)
+
+    @staticmethod
     def _get_history_line(
         label: str, entry: dict | None, last_reset_ts: str | None
     ) -> str:
         """History-Info-Zeile, nur wenn der Eintrag neuer als der letzte Reset ist."""
-        if not entry:
+        if not entry or LauncherApp._reset_since(entry, last_reset_ts):
             return ""
         entry_ts = datetime.fromisoformat(entry["timestamp"])
-        if last_reset_ts and entry_ts <= datetime.fromisoformat(last_reset_ts):
-            return ""
         folder_name = Path(entry["path"]).name
         return f"   Letzter {label}: {entry_ts.strftime('%d.%m.%Y %H:%M')} ({folder_name})\n"
 
@@ -257,14 +265,18 @@ class LauncherApp:
             items.append((path, f"{icon} {path} ({timestamp})"))
         return items
 
-    def _get_first_history_path(self, history_type: str) -> Path | str | None:
-        """Pfad des neuesten History-Eintrags dieses Typs, oder None (Alt-Einträge ohne
+    def _get_first_history_entry(self, history_type: str) -> dict | None:
+        """Neuester History-Eintrag dieses Typs, oder None (Alt-Einträge ohne
         type-Feld zählen für beide Typen)."""
         self.config_manager.reload()
         history = self.config_manager.config.get("history", [])
-        entry = next(
+        return next(
             (h for h in history if h.get("type", history_type) == history_type), None
         )
+
+    def _get_first_history_path(self, history_type: str) -> Path | str | None:
+        """Pfad des neuesten History-Eintrags dieses Typs, oder None."""
+        entry = self._get_first_history_entry(history_type)
         if entry is None:
             return None
         path_str = entry["path"]
@@ -337,6 +349,10 @@ class LauncherApp:
     def _confirm_export_target(self, destination: Path | str) -> bool:
         """Warnt wenn destination vom letzten Import-Pfad abweicht (Folder-Export hat
         Mirror-Semantik, überträgt also auch Löschungen). True = fortfahren."""
+        last_reset_ts = self.config_manager.config.get("last_reset_timestamp")
+        # Nach einem Reset ohne neueren Import hat der Workspace keinen Bezug mehr zum Import-Pfad
+        if self._reset_since(self._get_first_history_entry("import"), last_reset_ts):
+            return True
         import_path = self._get_first_history_path("import")
         if import_path == destination:
             return True

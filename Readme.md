@@ -17,7 +17,7 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 - **Ignore-Patterns** – Konfigurierbare Filter für Export und Import (z. B. `.git`, `.env`); optional wird zusätzlich eine `.gitignore` in Quelle/Ziel automatisch respektiert (`respect_gitignore`)
 - **Config-Hotkeys** – Optionen direkt im Hauptmenü togglen
 - **Shortcut-Cheatsheet** – Taste `h` zeigt eine Vollbild-Übersicht aller Shortcuts, schließt sich bei jedem beliebigen Tastendruck wieder
-- **Dynamischer Footer** – zeigt neben `[h]`/`[q]` die vier zuletzt verwendeten Shortcuts, sitzungsübergreifend in `config.toml` gemerkt
+- **Dynamischer Footer** – zeigt neben `[h]`/`[q]` die bis zu sechs zuletzt verwendeten Shortcuts, sitzungsübergreifend in `config.toml` gemerkt
 - **Maus-Navigation** – Hover wechselt die Auswahl, Klick bestätigt (Hauptmenü, Ja/Nein-Dialoge, Listen-Auswahl, Workspace-Inhalt anzeigen); per `config.toml` ab-/anschaltbar
 - **Workspace-Übersicht** – Mehrspaltige, nach letzter Änderung sortierte Dateiliste für schnelle Projekterkennung in breiten Terminal-Fenstern; Punkt-Ordner (z. B. `.git`) erscheinen als ein Eintrag mit rekursiv berechneter Gesamtgröße statt mit ihrem vollständigen Inhalt; 📁/📄-Symbole unterscheiden Ordner- und Datei-Einträge; `Enter`/Maus-Klick kopiert den Dateinamen des markierten Eintrags in die Zwischenablage
 - **Shell-Zugang** – Terminal im Workspace-Verzeichnis öffnen
@@ -56,7 +56,7 @@ uv sync
 task build
 ```
 
-Erstellt via Nuitka eine eigenständige Binary unter `~/bin/ClaudeCodeLauncher`.
+Erstellt via Nuitka eine eigenständige Binary (nur Build). `task` (Default-Task) baut zusätzlich, installiert nach `~/bin/ClaudeCodeLauncher` und räumt temporäre Dateien auf.
 
 ## Verwendung
 
@@ -129,7 +129,7 @@ Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann
 | `ask_for_reset`                | bool   | `true`   | Nach Folder-Export: Fragen ob Workspace zurückgesetzt werden soll                                                                       |
 | `dont_ask_on_export_overwrite` | bool   | `false`  | Überschreib-Bestätigung beim Export unterdrücken                                                                                        |
 | `mouse_navigation_enabled`     | bool   | `true`   | Maus-Hover/Klick in Hauptmenü, Ja/Nein-Dialogen, Listen-Auswahl und Workspace-Inhalt anzeigen                                           |
-| `recent_shortcuts`             | Liste  | `[]`     | Zuletzt verwendete Hotkey-Buchstaben (neuestes zuerst, max. 4), bestimmt den dynamischen Footer-Ausschnitt. Automatisch gepflegt        |
+| `recent_shortcuts`             | Liste  | `[]`     | Zuletzt verwendete Hotkey-Buchstaben (neuestes zuerst, max. 6), bestimmt den dynamischen Footer-Ausschnitt. Automatisch gepflegt        |
 | `usage_cache`                  | Dict   | `{}`     | Zwischengespeicherte Claude-Nutzungsstatistik der letzten erfolgreichen `openusage`-Abfrage. Automatisch gepflegt, nicht manuell ändern |
 | `prompt_manager_binary`        | string | `"qDrover"` | Binary-Name/Pfad für den Prompt-Manager (Menüpunkt „Prompts verwalten", Hotkey `p`); `~` im Pfad wird aufgelöst                     |
 | `prompt_manager_args`          | Liste  | `[]`     | Zusätzliche Argumente für den Prompt-Manager-Aufruf                                                                                     |
@@ -151,6 +151,7 @@ ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
 | ------------------- | ------------------------------------------------------------------------------------------------------------- |
 | `↑` / `↓`           | Navigation                                                                                                    |
 | `Tab` / `Shift+Tab` | Navigation (vor/zurück)                                                                                       |
+| `←` / `→`           | Spalte wechseln (gleiche Zeile)                                                                               |
 | Maus-Hover          | Auswahl wechselt zum Eintrag unter dem Zeiger (siehe `mouse_navigation_enabled`)                              |
 | Maus-Klick          | Eintrag auswählen (= Enter)                                                                                   |
 | `Enter` / `Space`   | Auswählen                                                                                                     |
@@ -166,7 +167,7 @@ ignore_patterns = [".*", ".git", ".env", "*.pyc", "__pycache__"]
 | `o`                 | `dont_ask_on_export_overwrite` togglen (nicht mehr im Footer, nur im Cheatsheet)                              |
 | `q`                 | Beenden                                                                                                       |
 
-Der Footer zeigt neben `[h]`/`[q]` dynamisch die vier zuletzt verwendeten Shortcuts (siehe `recent_shortcuts`).
+Der Footer zeigt neben `[h]`/`[q]` dynamisch die bis zu sechs zuletzt verwendeten Shortcuts (siehe `recent_shortcuts`).
 
 ### Ja/Nein-Dialoge
 

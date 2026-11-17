@@ -118,6 +118,12 @@ def test_build_content_entry_for_dot_folder_sums_nested_file_sizes(tmp_path):
     assert (rel_path, label) == (".git", "📁 .git  (15 B)")
 
 
+def test_get_contents_lists_broken_symlink_without_crashing(tmp_path):
+    (tmp_path / "java").symlink_to("/nonexistent/java")
+    manager = WorkspaceManager(tmp_path)
+    assert [rel_path for rel_path, _ in manager.get_contents()] == ["java"]
+
+
 # --- needs_overwrite_confirmation / matched_ignore_pattern ---
 
 

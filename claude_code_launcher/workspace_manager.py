@@ -126,7 +126,8 @@ class WorkspaceManager:
                 item.stat().st_size for item in path.rglob("*") if item.is_file()
             )
         else:
-            size = path.stat().st_size
+            # lstat statt stat: kaputte Symlinks (z. B. absolute Ziele in einem Rootfs) nicht auflösen
+            size = path.lstat().st_size
 
         if size < BYTES_PER_KB:
             size_str = f"{size} B"
@@ -138,7 +139,7 @@ class WorkspaceManager:
         icon = "📁" if path.is_dir() else "📄"
         label = f"{icon} {rel_path}  ({size_str})"
 
-        return rel_path, label, path.stat().st_mtime
+        return rel_path, label, path.lstat().st_mtime
 
     def get_contents(self) -> list[tuple[str, str]]:
         """Dateiliste für curses_browse(), neueste zuerst.

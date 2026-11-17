@@ -17,3 +17,19 @@ def test_history_line_shown_when_newer_than_reset() -> None:
 def test_history_line_shown_without_reset() -> None:
     expected = "   Letzter Export: 11.11.2026 11:00 (projekt)\n"
     assert LauncherApp._get_history_line("Export", ENTRY_BEFORE_RESET, None) == expected
+
+
+def test_reset_since_true_when_reset_after_entry() -> None:
+    assert LauncherApp._reset_since(ENTRY_BEFORE_RESET, RESET_TS) is True
+
+
+def test_reset_since_false_when_entry_after_reset() -> None:
+    assert LauncherApp._reset_since(ENTRY_AFTER_RESET, RESET_TS) is False
+
+
+def test_reset_since_false_without_reset() -> None:
+    assert LauncherApp._reset_since(ENTRY_BEFORE_RESET, None) is False
+
+
+def test_reset_since_true_without_entry_but_with_reset() -> None:
+    assert LauncherApp._reset_since(None, RESET_TS) is True

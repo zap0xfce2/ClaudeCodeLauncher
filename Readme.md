@@ -9,7 +9,7 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 ## Features
 
 - **Session-Management** – Neue Session im Workspace starten
-- **Export / Import** – Workspace als Backup sichern und wiederherstellen (Folder-Modus via `rsync`: Löschungen im Workspace werden ins Exportziel übertragen); jeder Export warnt, wenn das Ziel vom letzten Import-Pfad abweicht; im Folder-Modus zeigt eine Fortschrittszeile den Stand in % (Basis: Anzahl übertragener/gelöschter Einträge, nicht Bytes – ein rsync-Probelauf zählt vorab und zeigt dabei live „zähle Einträge … N“)
+- **Export / Import** – Workspace als Backup sichern und wiederherstellen (Folder-Modus via `rsync`: Löschungen im Workspace werden ins Exportziel übertragen); jeder Export warnt, wenn das Ziel vom letzten Import-Pfad abweicht (außer seit diesem Import wurde der Workspace resettet); im Folder-Modus zeigt eine Fortschrittszeile den Stand in % (Basis: Anzahl übertragener/gelöschter Einträge, nicht Bytes – ein rsync-Probelauf zählt vorab und zeigt dabei live „zähle Einträge … N“)
 - **Single-File-Modus** – Einzelne Dateien exportieren oder importieren
 - **SSH-Remote-Ziele** – Export/Import unterstützen neben lokalen Pfaden auch rsync-Remote-Ziele im SSH-Style (`user@host:/pfad` oder `host:/pfad`), sowohl im Folder- als auch im Single-File-Modus
 - **History** – Zuletzt verwendete Pfade werden gespeichert und vorgeschlagen; ein Import legt automatisch einen Export-Eintrag zum selben Pfad an, damit Quick-Export (`e`) direkt danach ohne Pfadauswahl funktioniert
@@ -133,7 +133,7 @@ Die Datei `config.toml` wird automatisch im Script-Verzeichnis erstellt und kann
 | `usage_cache`                  | Dict   | `{}`     | Zwischengespeicherte Claude-Nutzungsstatistik der letzten erfolgreichen `openusage`-Abfrage. Automatisch gepflegt, nicht manuell ändern |
 | `prompt_manager_binary`        | string | `"qDrover"` | Binary-Name/Pfad für den Prompt-Manager (Menüpunkt „Prompts verwalten", Hotkey `p`); `~` im Pfad wird aufgelöst                     |
 | `prompt_manager_args`          | Liste  | `[]`     | Zusätzliche Argumente für den Prompt-Manager-Aufruf                                                                                     |
-| `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern); blendet „Letzter Export“/„Letzter Import“ aus, bis wieder exportiert bzw. importiert wird |
+| `last_reset_timestamp`         | string | –        | Zeitstempel des letzten Resets (automatisch gesetzt, nicht manuell ändern); blendet „Letzter Export“/„Letzter Import“ aus, bis wieder exportiert bzw. importiert wird; unterdrückt außerdem die Export-Ziel-Warnung, solange seit dem Reset nicht importiert wurde |
 
 `claude_instruction` wird manuell in `config.toml` gepflegt; eine Änderung wirkt nach Drücken von `r` (Refresh) im Hauptmenü, ohne den Launcher neu zu starten. `r` fragt außerdem immer sofort die aktuelle Claude-Nutzungsstatistik neu ab (statt bis zu 5 Minuten alte gecachte Werte zu zeigen).
 

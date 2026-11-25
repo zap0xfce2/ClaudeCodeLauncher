@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from claude_code_launcher.launcher_app import LauncherApp
 
 RESET_TS = "2026-11-11T12:00:00"
@@ -33,3 +35,21 @@ def test_reset_since_false_without_reset() -> None:
 
 def test_reset_since_true_without_entry_but_with_reset() -> None:
     assert LauncherApp._reset_since(None, RESET_TS) is True
+
+
+def test_build_claude_command_without_session_or_instruction() -> None:
+    assert LauncherApp._build_claude_command(Path("/c"), "", "") == ["/c"]
+
+
+def test_build_claude_command_adds_name_before_instruction() -> None:
+    expected = ["/c", "--name", "meine session", "--", "Hallo"]
+    assert LauncherApp._build_claude_command(Path("/c"), "meine session", "Hallo") == expected
+
+
+def test_session_items_mark_active_session_and_list_it_first() -> None:
+    expected = [("b", "🔖 b *"), ("a", "🔖 a"), ("c", "🔖 c")]
+    assert LauncherApp._build_session_items(["a", "b", "c"], "b") == expected
+
+
+def test_session_items_without_active_session_keep_order() -> None:
+    assert LauncherApp._build_session_items(["a", "b"], "") == [("a", "🔖 a"), ("b", "🔖 b")]

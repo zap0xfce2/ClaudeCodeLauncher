@@ -56,7 +56,7 @@ SHORTCUT_LABELS: dict[str, str] = {
     "t": "Shell",
     "e": "Quick Export",
     "i": "Quick Import",
-    "v": "VS Code",
+    "n": "Sessions",
     "p": "Prompts verwalten",
     "x": "Nach Export zurücksetzen",
     "o": "Überschreiben bestätigen",
@@ -70,7 +70,7 @@ ACTION_TO_SHORTCUT: dict[str, str] = {
     "plan": "p",
     "export_first": "e",
     "import_first": "i",
-    "open_import_source": "v",
+    "sessions": "n",
 }
 
 # --- Dateigrößen ---
@@ -93,11 +93,18 @@ PERCENT_MAX = 100
 # Zeilenanfang + Rest der Zeile löschen, damit eine kürzere Fortschrittszeile keine Reste stehen lässt
 ANSI_REWRITE_LINE = "\r\x1b[K"
 
-# --- VS Code CLI (Importquelle öffnen) ---
-VSCODE_BINARY = "code"
-
 # --- Terminal leeren vor Claude-Start (launch_claude) ---
 CLEAR_BINARY = "/usr/bin/clear"
+
+# --- Session-Banner (session_banner.py, beide Binaries optional) ---
+FIGLET_BINARY = "figlet"
+LOLCAT_BINARY = "lolcat"
+ANSI_HIDE_CURSOR = "\x1b[?25l"
+ANSI_SHOW_CURSOR = "\x1b[?25h"
+# Folgebytes innerhalb dieser Zeit = Escape-Sequenz (Pfeiltaste), kein einzelnes ESC
+ESC_SEQUENCE_TIMEOUT = 0.05
+# Maximal pro Lesezugriff verworfene Bytes einer Escape-Sequenz
+ESC_SEQUENCE_READ_SIZE = 32
 
 # --- Shell / Login-Shell-PATH ---
 DEFAULT_SHELL = "/bin/zsh"

@@ -192,11 +192,12 @@ Der Footer zeigt neben `[h]`/`[q]` dynamisch die bis zu sechs zuletzt verwendete
 | Maus-Hover              | Auswahl wechselt zum Eintrag unter dem Zeiger                        |
 | Maus-Klick              | Auswahl bestätigen (= Enter, öffnet nicht den Edit-Dialog)           |
 | `Enter`                 | Auswahl bestätigen (Pfad-Auswahl: direkt übernehmen ohne Edit)       |
+| `d`                     | Eintrag löschen, mit Rückfrage (nur Session-Liste)                   |
 | `ESC` / `q`             | Abbrechen                                                            |
 
 Die Liste scrollt mit, wenn sie höher als das Terminal ist. Im Pfad-Auswahlmodus (`allow_edit`) öffnet `Tab` einen vorausgefüllten Edit-Dialog; `Enter` übernimmt den Pfad direkt.
 
-In der Session-Liste gilt dasselbe: `Enter` aktiviert die Session und zeigt den Banner, `Tab` benennt sie um (leerer Name = löschen). Eine noch aktive Session (z. B. nach geschlossenem Banner-Fenster) steht oben und ist mit `*` markiert.
+In der Session-Liste gilt dasselbe: `Enter` aktiviert die Session und zeigt den Banner, `Tab` benennt sie um (leerer Name = löschen), `d` löscht sie nach Rückfrage; danach öffnet sich die Liste erneut. Eine noch aktive Session (z. B. nach geschlossenem Banner-Fenster) steht oben und ist mit `*` markiert.
 
 ### Inhalt anzeigen
 

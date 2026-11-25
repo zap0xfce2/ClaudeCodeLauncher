@@ -30,6 +30,9 @@ from .constants import (
     MENU_START_ROW,
     MENU_TITLE_ROW,
     MIN_COLORS_FOR_XTERM256,
+    SELECT_ACTION_CHOOSE,
+    SELECT_ACTION_DELETE,
+    SELECT_ACTION_EDIT,
     SHORTCUT_LABELS,
     UI_PADDING_X,
     USAGE_STATS_COL_WIDTH,
@@ -683,6 +686,17 @@ def curses_input(
             cursor_pos += 1
 
 
+def _select_hint(allow_edit: bool, allow_delete: bool) -> str:
+    """Hint-Zeile von curses_select(), zeigt nur die im jeweiligen Modus aktiven Tasten."""
+    segments = ["[Enter] Auswählen"]
+    if allow_edit:
+        segments.append("[Tab] Bearbeiten")
+    if allow_edit and allow_delete:
+        segments.append("[d] Löschen")
+    segments.append("[ESC] Abbrechen")
+    return "  ".join(segments)
+
+
 @overload
 def curses_select(
     stdscr: "curses.window",
@@ -691,7 +705,8 @@ def curses_select(
     default_index: int,
     allow_edit: Literal[True],
     mouse_enabled: bool = True,
-) -> tuple[str | None, bool]: ...
+    allow_delete: bool = False,
+) -> tuple[str | None, str]: ...
 
 
 @overload
@@ -702,6 +717,7 @@ def curses_select(
     default_index: int = ...,
     allow_edit: Literal[False] = ...,
     mouse_enabled: bool = True,
+    allow_delete: Literal[False] = ...,
 ) -> str | None: ...
 
 
@@ -712,11 +728,13 @@ def curses_select(
     default_index: int = 0,
     allow_edit: bool = False,
     mouse_enabled: bool = True,
-) -> tuple[str | None, bool] | str | None:
+    allow_delete: bool = False,
+) -> tuple[str | None, str] | str | None:
     """Auswahl-Dialog für Listen (z. B. History).
 
-    allow_edit=True: Tab öffnet einen Editierdialog, Rückgabe ist (value, edit_mode)
-    statt nur value; (None, False) bei Abbruch statt nur None.
+    allow_edit=True: Rückgabe ist (value, SELECT_ACTION_*) statt nur value – Tab liefert
+    SELECT_ACTION_EDIT, mit allow_delete=True liefert d SELECT_ACTION_DELETE;
+    (None, SELECT_ACTION_CHOOSE) bei Abbruch statt nur None.
     """
     _init_curses_colors(stdscr)
     if mouse_enabled:
@@ -751,13 +769,11 @@ def curses_select(
                 else:
                     stdscr.addstr(y, ITEM_INDENT_X, f"  {label}")
 
-            # Hint-Zeile
-            if allow_edit:
-                hint = "[Enter] Auswählen  [Tab] Bearbeiten  [ESC] Abbrechen"
-            else:
-                hint = "[Enter] Auswählen  [ESC] Abbrechen"
             stdscr.addstr(
-                height - 2, UI_PADDING_X, hint, curses.color_pair(COLOR_PAIR_GRAY)
+                height - 2,
+                UI_PADDING_X,
+                _select_hint(allow_edit, allow_delete),
+                curses.color_pair(COLOR_PAIR_GRAY),
             )
 
             stdscr.refresh()
@@ -781,19 +797,21 @@ def curses_select(
                 current = hit
                 if bstate & curses.BUTTON1_CLICKED:
                     if allow_edit:
-                        return (items[current][0], False)
+                        return (items[current][0], SELECT_ACTION_CHOOSE)
                     return items[current][0]
             elif (
                 allow_edit and key == KEY_TAB
             ):  # Tab im Edit-Modus → Editierdialog öffnen
-                return (items[current][0], True)
+                return (items[current][0], SELECT_ACTION_EDIT)
+            elif allow_edit and allow_delete and key == ord("d"):
+                return (items[current][0], SELECT_ACTION_DELETE)
             elif key == ord("\n"):
                 if allow_edit:
-                    return (items[current][0], False)
+                    return (items[current][0], SELECT_ACTION_CHOOSE)
                 return items[current][0]
             elif key == KEY_ESC or key == ord("q"):
                 if allow_edit:
-                    return (None, False)
+                    return (None, SELECT_ACTION_CHOOSE)
                 return None
     finally:
         if mouse_enabled:

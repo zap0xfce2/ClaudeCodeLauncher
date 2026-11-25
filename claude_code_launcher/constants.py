@@ -20,6 +20,10 @@ HINT_GRAY_FALLBACK_COLOR = curses.COLOR_WHITE
 # --- Key Codes ---
 KEY_TAB = 9
 KEY_ESC = 27
+# Rückgabe-Aktionen von curses_select(allow_edit=True): Enter/Klick, Tab, d
+SELECT_ACTION_CHOOSE = "choose"
+SELECT_ACTION_EDIT = "edit"
+SELECT_ACTION_DELETE = "delete"
 KEY_BACKSPACE_DEL = 127
 KEY_SPACE = 32
 KEY_PRINTABLE_MAX = 126

@@ -43,6 +43,8 @@ class ConfigManager:
             "usage_cache": {},
             "prompt_manager_binary": "qDrover",
             "prompt_manager_args": [],
+            "sessions": [],
+            "active_session": "",
         }
 
         if not self.config_path.exists():
@@ -145,4 +147,30 @@ class ConfigManager:
         recent = [s for s in self.config.get("recent_shortcuts", []) if s != shortcut]
         recent.insert(0, shortcut)
         self.config["recent_shortcuts"] = recent[:RECENT_SHORTCUTS_MAX_ENTRIES]
+        self.save_config()
+
+    def add_session(self, name: str) -> None:
+        """Speichert Session-Namen (neuestes zuerst, dedupliziert); leere Namen werden ignoriert."""
+        name = name.strip()
+        if not name:
+            return
+        self.reload()
+        sessions = [s for s in self.config.get("sessions", []) if s != name]
+        self.config["sessions"] = [name, *sessions]
+        self.save_config()
+
+    def rename_session(self, old: str, new: str) -> None:
+        """Benennt Session an Ort und Stelle um; leerer neuer Name löscht sie."""
+        new = new.strip()
+        self.reload()
+        renamed = [new if s == old else s for s in self.config.get("sessions", []) if s == old or s != new]
+        self.config["sessions"] = [s for s in renamed if s]
+        if self.config.get("active_session") == old:
+            self.config["active_session"] = new
+        self.save_config()
+
+    def set_active_session(self, name: str) -> None:
+        """Setzt die aktive Session (leer = keine), geteilt über alle Instanzen via config.toml."""
+        self.reload()
+        self.config["active_session"] = name
         self.save_config()

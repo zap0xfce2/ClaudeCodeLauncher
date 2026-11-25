@@ -134,3 +134,90 @@ def test_record_reset_sets_last_reset_timestamp(tmp_path):
     manager = ConfigManager(tmp_path / "config.toml")
     manager.record_reset()
     assert "last_reset_timestamp" in manager.config
+
+
+def test_default_config_has_empty_sessions(tmp_path):
+    assert ConfigManager(tmp_path / "config.toml").config["sessions"] == []
+
+
+def test_default_config_has_no_active_session(tmp_path):
+    assert ConfigManager(tmp_path / "config.toml").config["active_session"] == ""
+
+
+def test_add_session_inserts_newest_first(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.add_session("a")
+    manager.add_session("b")
+    assert manager.config["sessions"] == ["b", "a"]
+
+
+def test_add_session_deduplicates(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.add_session("a")
+    manager.add_session("b")
+    manager.add_session("a")
+    assert manager.config["sessions"] == ["a", "b"]
+
+
+def test_add_session_strips_whitespace(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.add_session("  a  ")
+    assert manager.config["sessions"] == ["a"]
+
+
+def test_add_session_ignores_blank_name(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.add_session("   ")
+    assert manager.config["sessions"] == []
+
+
+def test_rename_session_replaces_in_place(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.add_session("a")
+    manager.add_session("b")
+    manager.rename_session("a", "c")
+    assert manager.config["sessions"] == ["b", "c"]
+
+
+def test_rename_session_to_existing_name_deduplicates(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.add_session("a")
+    manager.add_session("b")
+    manager.rename_session("a", "b")
+    assert manager.config["sessions"] == ["b"]
+
+
+def test_rename_session_with_blank_name_deletes(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.add_session("a")
+    manager.rename_session("a", "  ")
+    assert manager.config["sessions"] == []
+
+
+def test_rename_active_session_updates_active(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.add_session("a")
+    manager.set_active_session("a")
+    manager.rename_session("a", "c")
+    assert manager.config["active_session"] == "c"
+
+
+def test_delete_active_session_clears_active(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.add_session("a")
+    manager.set_active_session("a")
+    manager.rename_session("a", "")
+    assert manager.config["active_session"] == ""
+
+
+def test_set_active_session_persists(tmp_path):
+    config_path = tmp_path / "config.toml"
+    ConfigManager(config_path).set_active_session("a")
+    assert ConfigManager(config_path).config["active_session"] == "a"
+
+
+def test_rename_session_to_same_name_keeps_it(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.add_session("a")
+    manager.rename_session("a", "a")
+    assert manager.config["sessions"] == ["a"]

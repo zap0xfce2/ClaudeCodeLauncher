@@ -142,11 +142,8 @@ class LauncherApp:
             else f"   {status['file_count']} Dateien · {status['size_mb']} MB"
         )
 
-        active_session = self.config_manager.config.get("active_session", "")
-        session_line = f"🔖 {active_session}\n" if active_session else ""
-
         return (
-            f"📁 {workspace_path}\n{session_line}{content_line}\n"
+            f"📁 {workspace_path}\n{content_line}\n"
             f"{export_line}{import_line}{footer}"
         )
 

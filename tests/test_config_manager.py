@@ -221,3 +221,17 @@ def test_rename_session_to_same_name_keeps_it(tmp_path):
     manager.add_session("a")
     manager.rename_session("a", "a")
     assert manager.config["sessions"] == ["a"]
+
+
+def test_clear_active_session_clears_matching_session(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.set_active_session("a")
+    manager.clear_active_session("a")
+    assert manager.config["active_session"] == ""
+
+
+def test_clear_active_session_keeps_session_activated_elsewhere(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.set_active_session("b")
+    manager.clear_active_session("a")
+    assert manager.config["active_session"] == "b"

@@ -369,7 +369,7 @@ class LauncherApp:
         try:
             show_session_banner(name)
         finally:
-            self.config_manager.set_active_session("")
+            self.config_manager.clear_active_session(name)
 
     def handle_reset(self) -> None:
         """Reset-Operation mit Bestätigung."""

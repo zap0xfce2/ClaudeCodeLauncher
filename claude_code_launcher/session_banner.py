@@ -29,7 +29,8 @@ def _render_art(name: str, cols: int) -> str:
     """figlet-ASCII-Art des Namens; ohne figlet nur zentrierter Klartext."""
     try:
         result = subprocess.run(
-            [FIGLET_BINARY, "-c", "-w", str(cols), name],
+            # "--" verhindert, dass ein Name mit führendem "-" als figlet-Option gilt
+            [FIGLET_BINARY, "-c", "-w", str(cols), "--", name],
             capture_output=True,
             text=True,
             check=True,

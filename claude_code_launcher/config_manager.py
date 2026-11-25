@@ -169,6 +169,14 @@ class ConfigManager:
             self.config["active_session"] = new
         self.save_config()
 
+    def clear_active_session(self, name: str) -> None:
+        """Deaktiviert name nur, wenn keine andere Instanz inzwischen eine andere Session aktiviert hat."""
+        self.reload()
+        if self.config.get("active_session") != name:
+            return
+        self.config["active_session"] = ""
+        self.save_config()
+
     def set_active_session(self, name: str) -> None:
         """Setzt die aktive Session (leer = keine), geteilt über alle Instanzen via config.toml."""
         self.reload()

@@ -235,3 +235,10 @@ def test_clear_active_session_keeps_session_activated_elsewhere(tmp_path):
     manager.set_active_session("b")
     manager.clear_active_session("a")
     assert manager.config["active_session"] == "b"
+
+
+def test_rename_missing_session_keeps_existing_target(tmp_path):
+    manager = ConfigManager(tmp_path / "config.toml")
+    manager.add_session("b")
+    manager.rename_session("a", "b")
+    assert manager.config["sessions"] == ["b"]

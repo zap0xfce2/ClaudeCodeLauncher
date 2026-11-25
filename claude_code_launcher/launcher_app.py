@@ -763,12 +763,13 @@ class LauncherApp:
 
             force_usage_refresh = False
             while True:
-                status = self.workspace_manager.get_status()
-                menu_items = self.get_menu_items()
-                status_text = self._build_status_text(status)
+                # Zuerst: lädt die Config neu, damit der Status Änderungen anderer Instanzen zeigt
                 usage_stats_text = self._build_usage_stats_text(
                     self._get_cached_usage_stats(force=force_usage_refresh)
                 )
+                status = self.workspace_manager.get_status()
+                menu_items = self.get_menu_items()
+                status_text = self._build_status_text(status)
                 force_usage_refresh = False
                 mouse_enabled = self._is_mouse_navigation_enabled()
 

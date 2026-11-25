@@ -54,7 +54,9 @@ def _has_pending_input(fd: int) -> bool:
 
 
 def _wait_for_escape() -> None:
-    """Blockiert bis zu einem einzelnen ESC; Escape-Sequenzen (z. B. Pfeiltasten) werden verworfen."""
+    """Blockiert bis zu einem einzelnen ESC oder Ctrl+C; Escape-Sequenzen (z. B. Pfeiltasten) werden verworfen."""
+    if not sys.stdin.isatty():
+        return
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     try:
@@ -66,6 +68,9 @@ def _wait_for_escape() -> None:
                 return
             while _has_pending_input(fd):
                 os.read(fd, ESC_SEQUENCE_READ_SIZE)
+    except KeyboardInterrupt:
+        # Ctrl+C schließt nur den Banner, nicht den ganzen Launcher
+        return
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 

@@ -13,9 +13,9 @@ from .constants import (
     CLEAR_BINARY,
     DEFAULT_SHELL,
     SHORTCUT_LABELS,
-    VSCODE_BINARY,
 )
 from .remote_target import _is_remote_target, _remote_path_part
+from .session_banner import show_session_banner
 from .ui_curses import (
     curses_browse,
     curses_confirm,
@@ -97,7 +97,7 @@ class LauncherApp:
             items.append(("export", "🔼 Exportieren"))
 
         items.append(("import", "🔽 Importieren"))
-        items.append(("open_import_source", "🧭 Importquelle in VS Code öffnen"))
+        items.append(("sessions", "🔖 Sessions"))
 
         if not is_empty:
             items.append(("browse", "📂 Inhalt von Workspace anzeigen"))
@@ -139,8 +139,12 @@ class LauncherApp:
             else f"   {status['file_count']} Dateien · {status['size_mb']} MB"
         )
 
+        active_session = self.config_manager.config.get("active_session", "")
+        session_line = f"🔖 {active_session}\n" if active_session else ""
+
         return (
-            f"📁 {workspace_path}\n{content_line}\n{export_line}{import_line}{footer}"
+            f"📁 {workspace_path}\n{session_line}{content_line}\n"
+            f"{export_line}{import_line}{footer}"
         )
 
     @staticmethod
@@ -305,31 +309,67 @@ class LauncherApp:
             return
         self.handle_import(source)
 
-    def handle_open_import_source(self) -> None:
-        """Öffnet den ersten Import-Eintrag der History in VS Code."""
-        source = self._get_first_history_path("import")
-        if source is None:
-            curses.wrapper(
-                curses_message, "VS Code", "Kein Import-Eintrag in der History"
+    def handle_sessions(self) -> None:
+        """Session-Auswahl: Enter = aktivieren + Banner, Tab = umbenennen (leer = löschen)."""
+        self.config_manager.reload()
+        sessions = self.config_manager.config.get("sessions", [])
+        if not sessions:
+            self._create_and_show_session()
+            return
+
+        active = self.config_manager.config.get("active_session", "")
+        items = self._build_session_items(sessions, active)
+        items.append(("__custom__", "📝 Neue Session anlegen"))
+        raw = curses.wrapper(
+            curses_select,
+            "Session auswählen:",
+            items,
+            0,
+            True,
+            self._is_mouse_navigation_enabled(),
+        )
+        # Nicht `raw or (None, False)` - das schlägt bei raw=(None, False) fehl
+        selected, edit_mode = raw if raw is not None else (None, False)
+
+        if selected is None:
+            return
+        if selected == "__custom__":
+            self._create_and_show_session()
+        elif edit_mode:
+            new_name = curses.wrapper(
+                curses_input, "Session-Name anpassen (leer = löschen):", selected
             )
+            if new_name is not None:
+                self.config_manager.rename_session(selected, new_name)
+        else:
+            self._activate_and_show_session(selected)
+
+    @staticmethod
+    def _build_session_items(
+        sessions: list[str], active: str
+    ) -> list[tuple[str, str]]:
+        """Aktive Session zuerst und mit `*` markiert (z. B. nach geschlossenem Banner-Fenster)."""
+        ordered = sorted(sessions, key=lambda name: name != active)
+        return [
+            (name, f"🔖 {name} *" if name == active else f"🔖 {name}")
+            for name in ordered
+        ]
+
+    def _create_and_show_session(self) -> None:
+        """Fragt neuen Session-Namen ab, speichert ihn und aktiviert ihn sofort."""
+        name = curses.wrapper(curses_input, "Session-Name eingeben:", "")
+        if not name or not name.strip():
             return
-        if isinstance(source, str):
-            curses.wrapper(
-                curses_message, "VS Code", "VS Code kann keine Remote-Pfade (SSH) öffnen"
-            )
-            return
-        if not source.exists():
-            curses.wrapper(curses_message, "VS Code", f"Pfad existiert nicht: {source}")
-            return
+        self.config_manager.add_session(name)
+        self._activate_and_show_session(name.strip())
+
+    def _activate_and_show_session(self, name: str) -> None:
+        """Aktiviert Session für alle Instanzen, zeigt Banner bis ESC, deaktiviert danach."""
+        self.config_manager.set_active_session(name)
         try:
-            subprocess.run([VSCODE_BINARY, str(source)])
-        except FileNotFoundError:
-            curses.wrapper(
-                curses_message,
-                "VS Code",
-                "code-Kommando nicht gefunden – in VS Code "
-                "„Shell Command: Install 'code' command in PATH“ ausführen",
-            )
+            show_session_banner(name)
+        finally:
+            self.config_manager.set_active_session("")
 
     def handle_reset(self) -> None:
         """Reset-Operation mit Bestätigung."""
@@ -578,6 +618,18 @@ class LauncherApp:
         self.config_manager.add_to_history(source, "import")
         self.config_manager.add_to_history(source, "export", synthetic=True)
 
+    @staticmethod
+    def _build_claude_command(
+        claude_binary: Path, session: str, instruction: str
+    ) -> list[str]:
+        """claude-Aufruf; --name vor dem `--`-Separator, der vor Flag-Injection schützt."""
+        cmd = [str(claude_binary)]
+        if session:
+            cmd.extend(["--name", session])
+        if instruction:
+            cmd.extend(["--", instruction])
+        return cmd
+
     def launch_claude(self) -> bool:
         """Startet Claude als Subprocess, kehrt nach Exit zum Menü zurück (Rückgabe stets True)."""
         if not self.claude_binary.exists():
@@ -590,13 +642,13 @@ class LauncherApp:
             env = os.environ.copy()
             env.update(self.config_manager.config.get("claude_env", {}))
 
-            cmd = [str(self.claude_binary)]
-
-            instruction = self.config_manager.config.get(
-                "claude_instruction", ""
-            ).strip()
-            if instruction:
-                cmd.extend(["--", instruction])
+            self.config_manager.reload()
+            config = self.config_manager.config
+            cmd = self._build_claude_command(
+                self.claude_binary,
+                config.get("active_session", "").strip(),
+                config.get("claude_instruction", "").strip(),
+            )
 
             result = subprocess.run(
                 cmd,
@@ -663,8 +715,8 @@ class LauncherApp:
             self.handle_export_first()
         elif action == "import_first":
             self.handle_import_first()
-        elif action == "open_import_source":
-            self.handle_open_import_source()
+        elif action == "sessions":
+            self.handle_sessions()
         elif action == "browse":
             self.handle_browse()
         elif action == "plan":

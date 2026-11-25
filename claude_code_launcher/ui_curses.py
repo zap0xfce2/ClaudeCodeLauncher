@@ -541,8 +541,8 @@ def curses_menu(
                 return "export_first"
             elif key == ord("i"):
                 return "import_first"
-            elif key == ord("v"):
-                return "open_import_source"
+            elif key == ord("n"):
+                return "sessions"
     finally:
         if mouse_enabled:
             _disable_mouse_tracking()

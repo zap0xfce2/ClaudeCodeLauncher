@@ -56,7 +56,7 @@ SHORTCUT_LABELS: dict[str, str] = {
     "t": "Shell",
     "e": "Quick Export",
     "i": "Quick Import",
-    "v": "VS Code",
+    "n": "Sessions",
     "p": "Prompts verwalten",
     "x": "Nach Export zurücksetzen",
     "o": "Überschreiben bestätigen",
@@ -70,7 +70,7 @@ ACTION_TO_SHORTCUT: dict[str, str] = {
     "plan": "p",
     "export_first": "e",
     "import_first": "i",
-    "open_import_source": "v",
+    "sessions": "n",
 }
 
 # --- Dateigrößen ---
@@ -92,9 +92,6 @@ RSYNC_ITEM_LINE_REGEX = r"^[<>ch.*][fdLDS]"
 PERCENT_MAX = 100
 # Zeilenanfang + Rest der Zeile löschen, damit eine kürzere Fortschrittszeile keine Reste stehen lässt
 ANSI_REWRITE_LINE = "\r\x1b[K"
-
-# --- VS Code CLI (Importquelle öffnen) ---
-VSCODE_BINARY = "code"
 
 # --- Terminal leeren vor Claude-Start (launch_claude) ---
 CLEAR_BINARY = "/usr/bin/clear"

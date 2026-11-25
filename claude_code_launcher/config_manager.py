@@ -163,7 +163,11 @@ class ConfigManager:
         """Benennt Session an Ort und Stelle um; leerer neuer Name löscht sie."""
         new = new.strip()
         self.reload()
-        renamed = [new if s == old else s for s in self.config.get("sessions", []) if s == old or s != new]
+        sessions = self.config.get("sessions", [])
+        # Andere Instanz hat old schon gelöscht/umbenannt – sonst ginge ein bestehendes new verloren
+        if old not in sessions:
+            return
+        renamed = [new if s == old else s for s in sessions if s == old or s != new]
         self.config["sessions"] = [s for s in renamed if s]
         if self.config.get("active_session") == old:
             self.config["active_session"] = new

@@ -8,7 +8,7 @@ Ich wollte Claude Code nicht direkt in meinen Projekten rumfuhrwerken lassen und
 
 ## Features
 
-- **Session-Management** – Neue Session im Workspace starten; benannte Sessions (Menüpunkt „🔖 Sessions“, Hotkey `n`) werden in `config.toml` gespeichert. Die gewählte Session wird aktiv, als Vollbild-Banner angezeigt (`figlet`/`lolcat`, `ESC` beendet Banner und Session) und beim Start als `claude --name <session>` übergeben – gedacht für mehrere parallele Launcher-Instanzen (eine zeigt den Banner, eine startet Claude)
+- **Session-Management** – Neue Session im Workspace starten; benannte Sessions (Menüpunkt „🔖 Sessions“, Hotkey `n`) werden in `config.toml` gespeichert. Die gewählte Session wird aktiv, als Vollbild-Banner angezeigt (`figlet`/`lolcat`, `ESC` oder `Ctrl+C` beendet Banner und Session) und beim Start als `claude --name <session>` übergeben – gedacht für mehrere parallele Launcher-Instanzen (eine zeigt den Banner, eine startet Claude)
 - **Export / Import** – Workspace als Backup sichern und wiederherstellen (Folder-Modus via `rsync`: Löschungen im Workspace werden ins Exportziel übertragen); jeder Export warnt, wenn das Ziel vom letzten Import-Pfad abweicht (außer seit diesem Import wurde der Workspace resettet); im Folder-Modus zeigt eine Fortschrittszeile den Stand in % (Basis: Anzahl übertragener/gelöschter Einträge, nicht Bytes – ein rsync-Probelauf zählt vorab und zeigt dabei live „zähle Einträge … N“)
 - **Single-File-Modus** – Einzelne Dateien exportieren oder importieren
 - **SSH-Remote-Ziele** – Export/Import unterstützen neben lokalen Pfaden auch rsync-Remote-Ziele im SSH-Style (`user@host:/pfad` oder `host:/pfad`), sowohl im Folder- als auch im Single-File-Modus
@@ -197,7 +197,7 @@ Der Footer zeigt neben `[h]`/`[q]` dynamisch die bis zu sechs zuletzt verwendete
 
 Die Liste scrollt mit, wenn sie höher als das Terminal ist. Im Pfad-Auswahlmodus (`allow_edit`) öffnet `Tab` einen vorausgefüllten Edit-Dialog; `Enter` übernimmt den Pfad direkt.
 
-In der Session-Liste gilt dasselbe: `Enter` aktiviert die Session und zeigt den Banner, `Tab` benennt sie um (leerer Name = löschen), `d` löscht sie nach Rückfrage; danach öffnet sich die Liste erneut. Eine noch aktive Session (z. B. nach geschlossenem Banner-Fenster) steht oben und ist mit `*` markiert.
+In der Session-Liste gilt dasselbe: `Enter` aktiviert die Session und zeigt den Banner, `Tab` benennt sie um (leerer Name = löschen), `d` löscht sie nach Rückfrage; danach öffnet sich die Liste erneut. Eine noch aktive Session (z. B. nach geschlossenem Banner-Fenster) steht oben und ist mit `*` markiert. Solange sie aktiv ist, startet jede Instanz Claude mit `--name <session>`. Lösen: `n` → Session mit `*` per `Enter` öffnen → `ESC` (oder `Ctrl+C`) schließt den Banner und deaktiviert sie.
 
 ### Inhalt anzeigen
 

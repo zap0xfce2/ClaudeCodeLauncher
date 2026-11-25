@@ -99,6 +99,16 @@ VSCODE_BINARY = "code"
 # --- Terminal leeren vor Claude-Start (launch_claude) ---
 CLEAR_BINARY = "/usr/bin/clear"
 
+# --- Session-Banner (session_banner.py, beide Binaries optional) ---
+FIGLET_BINARY = "figlet"
+LOLCAT_BINARY = "lolcat"
+ANSI_HIDE_CURSOR = "\x1b[?25l"
+ANSI_SHOW_CURSOR = "\x1b[?25h"
+# Folgebytes innerhalb dieser Zeit = Escape-Sequenz (Pfeiltaste), kein einzelnes ESC
+ESC_SEQUENCE_TIMEOUT = 0.05
+# Maximal pro Lesezugriff verworfene Bytes einer Escape-Sequenz
+ESC_SEQUENCE_READ_SIZE = 32
+
 # --- Shell / Login-Shell-PATH ---
 DEFAULT_SHELL = "/bin/zsh"
 LOGIN_SHELL_PATH_PROBE_TIMEOUT = 5

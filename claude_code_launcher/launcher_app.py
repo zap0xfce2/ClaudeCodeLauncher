@@ -12,6 +12,9 @@ from .constants import (
     ACTION_TO_SHORTCUT,
     CLEAR_BINARY,
     DEFAULT_SHELL,
+    SELECT_ACTION_CHOOSE,
+    SELECT_ACTION_DELETE,
+    SELECT_ACTION_EDIT,
     SHORTCUT_LABELS,
 )
 from .remote_target import _is_remote_target, _remote_path_part
@@ -224,15 +227,16 @@ class LauncherApp:
                 True,
                 self._is_mouse_navigation_enabled(),
             )
-            # Nicht `raw or (None, False)` - das schlägt bei raw=(None, False) fehl
-            selected, edit_mode = raw if raw is not None else (None, False)
+            selected, action = (
+                raw if raw is not None else (None, SELECT_ACTION_CHOOSE)
+            )
 
             if selected is None:
                 return None
 
             if selected == "__custom__":
                 path_input = curses.wrapper(curses_input, input_prompt, "")
-            elif edit_mode:
+            elif action == SELECT_ACTION_EDIT:
                 path_input = curses.wrapper(curses_input, input_edit_prompt, selected)
             else:
                 path_input = selected
@@ -310,7 +314,7 @@ class LauncherApp:
         self.handle_import(source)
 
     def handle_sessions(self) -> None:
-        """Session-Auswahl: Enter = aktivieren + Banner, Tab = umbenennen (leer = löschen)."""
+        """Session-Auswahl: Enter = Banner, Tab = umbenennen (leer = löschen), d = löschen."""
         self.config_manager.reload()
         sessions = self.config_manager.config.get("sessions", [])
         if not sessions:
@@ -327,22 +331,42 @@ class LauncherApp:
             0,
             True,
             self._is_mouse_navigation_enabled(),
+            True,
         )
-        # Nicht `raw or (None, False)` - das schlägt bei raw=(None, False) fehl
-        selected, edit_mode = raw if raw is not None else (None, False)
+        selected, action = raw if raw is not None else (None, SELECT_ACTION_CHOOSE)
 
         if selected is None:
             return
         if selected == "__custom__":
-            self._create_and_show_session()
-        elif edit_mode:
-            new_name = curses.wrapper(
-                curses_input, "Session-Name anpassen (leer = löschen):", selected
-            )
-            if new_name is not None:
-                self.config_manager.rename_session(selected, new_name)
+            if action == SELECT_ACTION_CHOOSE:
+                self._create_and_show_session()
+        elif action == SELECT_ACTION_EDIT:
+            self._rename_session(selected)
+        elif action == SELECT_ACTION_DELETE:
+            self._delete_session(selected)
         else:
             self._activate_and_show_session(selected)
+
+    def _rename_session(self, name: str) -> None:
+        """Edit-Dialog vorausgefüllt mit name; ESC = keine Änderung, leer = löschen."""
+        new_name = curses.wrapper(
+            curses_input, "Session-Name anpassen (leer = löschen):", name
+        )
+        if new_name is not None:
+            self.config_manager.rename_session(name, new_name)
+
+    def _delete_session(self, name: str) -> None:
+        """Löscht name nach Rückfrage und kehrt zur Liste zurück, solange Sessions übrig sind."""
+        confirmed = curses.wrapper(
+            curses_confirm,
+            f"Session „{name}“ löschen?",
+            False,
+            self._is_mouse_navigation_enabled(),
+        )
+        if confirmed:
+            self.config_manager.rename_session(name, "")
+        if self.config_manager.config.get("sessions"):
+            self.handle_sessions()
 
     @staticmethod
     def _build_session_items(

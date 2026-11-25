@@ -241,3 +241,12 @@ def test_select_item_at_position_applies_scroll_offset():
 )
 def test_select_item_at_position_misses(scroll_offset, mouse_y):
     assert ui_curses._select_item_at_position(SELECT_ITEMS, scroll_offset, mouse_y, mouse_x=6, height=10) is None
+
+
+def test_select_hint_without_edit_or_delete():
+    assert ui_curses._select_hint(False, False) == "[Enter] Auswählen  [ESC] Abbrechen"
+
+
+def test_select_hint_with_edit_and_delete():
+    expected = "[Enter] Auswählen  [Tab] Bearbeiten  [d] Löschen  [ESC] Abbrechen"
+    assert ui_curses._select_hint(True, True) == expected
